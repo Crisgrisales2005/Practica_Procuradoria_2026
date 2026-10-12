@@ -1,0 +1,63 @@
+# Manifiesto estático de descargas (fuentes oficiales verificadas a mano).
+# No generado por IA. Solo GET de estas URLs — sin descubrimiento.
+entidad: pgn
+destino: documentos_entidades/pgn
+items:
+  - archivo: constitucion_politica_1991.pdf
+    # SUIN (viewDocument.asp?id=1687988) entrega shell HTML/SPA, no el PDF.
+    # Fuente oficial alternativa: Gestor Normativo Función Pública.
+    url: "https://www.funcionpublica.gov.co/eva/gestornormativo/norma_pdf.php?i=41249"
+    tipo: pdf
+    modulos: [esp_01]
+    ingerir: true
+    norma: Constitución Política de Colombia de 1991
+
+  - archivo: ley_2220_2022_estatuto_conciliacion.pdf
+    url: "https://www.procuraduria.gov.co/Documents/Diciembre%202023/LEY%202220%20DE%202022_Nuevo%20Estatuto%20de%20conciliaci%C3%B3n.pdf"
+    tipo: pdf
+    modulos: [esp_02]
+    ingerir: true
+    norma: Ley 2220 de 2022
+
+  - archivo: ley_1437_2011_cpaca.pdf
+    url: "https://www.procuraduria.gov.co/Documents/2024/Septiembre%202024/LEY%201437%20DE%202011.pdf"
+    tipo: pdf
+    modulos: [esp_03]
+    ingerir: true
+    norma: Ley 1437 de 2011
+
+  - archivo: ley_594_2000_archivos.pdf
+    url: "https://normativa.archivogeneral.gov.co/ley-594-de-2000/?pdf=41"
+    tipo: pdf
+    modulos: [esp_06, com_13]
+    ingerir: true
+    norma: Ley 594 de 2000
+
+  - archivo: codigo_general_disciplinario_1952_2094.pdf
+    url: "https://iemp.gov.co/wp-content/uploads/2022/09/Co%CC%81digo-General-Disciplinario-edicio%CC%81n-bolsillo.pdf"
+    tipo: pdf
+    modulos: [esp_08]
+    ingerir: true
+    norma: Código General Disciplinario (Ley 1952 de 2019 y Ley 2094 de 2021)
+
+  - archivo: manual_mipg_v6_1.pdf
+    url: "https://www1.funcionpublica.gov.co/documents/28587410/57410531/2026-02-10_Documento_manual_operativo_mdi_v6.1.pdf"
+    tipo: pdf
+    modulos: [com_12]
+    ingerir: true
+    norma: Manual Operativo del Modelo Integrado de Planeación y Gestión (MIPG) v6.1
+
+  # HTML: se descargan; NO se ingieren en Fase 8 (sin chunking por artículo).
+  - archivo: protocolo_atencion_ciudadano.html
+    url: "https://apps.procuraduria.gov.co/portal/media/file/protocolos_de_atencion_al_ciudadano/html/index-2.html"
+    tipo: html
+    modulos: [esp_05]
+    ingerir: false
+    norma: Protocolos de atención al ciudadano (PGN)
+
+  - archivo: estructura_organica_pgn.html
+    url: "https://www.procuraduria.gov.co/procuraduria/conozca-entidad/Pages/estructura.aspx"
+    tipo: html
+    modulos: [com_10]
+    ingerir: false
+    norma: Estructura orgánica de la PGN

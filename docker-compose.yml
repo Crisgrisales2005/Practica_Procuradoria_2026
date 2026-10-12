@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      DATA_ROOT: /data
+      DOCUMENTOS_DIR: /data/documentos_entidades
+      HF_HOME: /data/hf_cache
+      SENTENCE_TRANSFORMERS_HOME: /data/hf_cache
+    volumes:
+      - ./data/sqlite:/data/sqlite
+      - ./data/chroma:/data/chroma
+      - ./data/hf_cache:/data/hf_cache
+      - ./documentos_entidades:/data/documentos_entidades
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

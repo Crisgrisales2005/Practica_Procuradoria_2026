@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+data/sqlite/*
+!data/sqlite/.gitkeep
+data/chroma/*
+!data/chroma/.gitkeep
+data/hf_cache/*
+!data/hf_cache/.gitkeep
+
+.env

@@ -1,0 +1,73 @@
+# Queries escritas a mano para el lote de generación. No las produce el modelo.
+# Sin corpus ingerido (esp_04, esp_05 HTML, esp_07, com_09–11) el umbral RAG omite la query.
+entidad: pgn
+modulos:
+  esp_08:
+    - dirección del Ministerio Público
+    - estructura de la Procuraduría General de la Nación
+    - funciones del Procurador General
+    - carrera administrativa en la Procuraduría
+    - inhabilidades de los servidores de la Procuraduría
+    - requisitos para ser Procurador General
+    - período del Procurador General
+    - funciones del Viceprocurador
+    - personeros municipales y distritales
+    - facultades disciplinarias de la Procuraduría
+    - prevención y control de gestión
+    - intervención ante las autoridades judiciales
+    - régimen especial de la Procuraduría frente a la función pública
+    - Procuradurías Delegadas
+    - Procuradurías Regionales y Provinciales
+    - requisitos de ingreso a la carrera de la Procuraduría
+    - incompatibilidades de los servidores de la PGN
+    - evaluación del desempeño en la Procuraduría
+    - comisiones de servicios y encargos
+    - faltas y régimen disciplinario interno de la Procuraduría
+  esp_01:
+    - Constitución Política función pública
+    - debido proceso administrativo
+    - mecanismos de protección constitucional
+  esp_02:
+    - conciliación extrajudicial requisito de procedibilidad
+    - rol del Ministerio Público en la conciliación
+    - Estatuto de Conciliación
+  esp_03:
+    - derecho de petición PQRSDF
+    - silencio administrativo
+    - recursos en la actuación administrativa
+  esp_04:
+    - elaboración de documentos de oficina
+    - oficios y memorandos
+    - estilo de comunicación oficial
+  esp_05:
+    - atención al usuario en la Procuraduría
+    - trato digno al ciudadano
+    - orientación de PQRSDF
+  esp_06:
+    - Ley 594 de 2000 archivo
+    - tablas de retención documental
+    - cadena de custodia de documentos
+  esp_07:
+    - bases de datos administrativas
+    - registro de información
+    - consulta de sistemas de información
+  com_09:
+    - gestión pública y funcionamiento del Estado
+    - principios de la función administrativa
+    - organización del Estado colombiano
+  com_10:
+    - estructura de la Procuraduría General
+    - organización y funciones de la PGN
+    - Ministerio Público
+  com_11:
+    - herramientas ofimáticas
+    - hoja de cálculo
+    - procesador de texto
+  com_12:
+    - sistemas de gestión de calidad
+    - control interno
+    - mejora continua
+  com_13:
+    - gestión documental
+    - correspondencia
+    - archivo de gestión
