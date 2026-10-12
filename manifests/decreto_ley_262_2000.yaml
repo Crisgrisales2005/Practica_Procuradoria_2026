@@ -1,4 +1,4 @@
 entidad: pgn
 archivo: decreto_ley_262_2000.pdf
-norma: Decreto Ley 262 de 2000
-modulo: esp_08
+norma: Decreto Ley 262 de 2000 (estructura y organización de la PGN)
+modulos: [esp_08, com_10]

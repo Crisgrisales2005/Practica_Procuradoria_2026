@@ -285,6 +285,38 @@ export default function App() {
       {progreso && (
         <section className="panel" aria-label="Progreso de práctica">
           <h2>Progreso de práctica</h2>
+          {(() => {
+            const total = progreso.intentos_totales || 0;
+            const pctAcierto =
+              total > 0
+                ? Math.round((progreso.aciertos_optimos / total) * 100)
+                : 0;
+            return (
+              <div className="acierto-bar" aria-label="Porcentaje de acierto">
+                <div className="acierto-bar-head">
+                  <span>Acierto óptimo</span>
+                  <strong>{total === 0 ? "—" : `${pctAcierto}%`}</strong>
+                </div>
+                <div
+                  className="acierto-bar-track"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pctAcierto}
+                >
+                  <div
+                    className="acierto-bar-fill"
+                    style={{ width: `${pctAcierto}%` }}
+                  />
+                </div>
+                <p className="acierto-bar-hint">
+                  {total === 0
+                    ? "Aún no hay respuestas en este módulo."
+                    : `${progreso.aciertos_optimos} óptimas de ${total} intentos (parciales y fallos no cuentan como acierto).`}
+                </p>
+              </div>
+            );
+          })()}
           <div className="metrics">
             <div className="metric">
               <strong>{progreso.para_hoy}</strong>
@@ -296,7 +328,7 @@ export default function App() {
             </div>
             <div className="metric">
               <strong>{progreso.programados}</strong>
-              <span>Programados</span>
+              <span>Programados (próximos días)</span>
             </div>
             <div className="metric">
               <strong>{progreso.dudosos}</strong>
@@ -336,7 +368,12 @@ export default function App() {
         <p>Este módulo aún no tiene preguntas en el banco.</p>
       )}
       {vacio === "sin_pendientes" && (
-        <p>No hay más pendientes por ahora. Vuelve más tarde o elige otro módulo.</p>
+        <p>
+          No hay más pendientes <strong>para hoy</strong>.
+          {progreso && progreso.programados > 0
+            ? ` Hay ${progreso.programados} repaso${progreso.programados === 1 ? "" : "s"} agendado${progreso.programados === 1 ? "" : "s"} para próximos días (SRS).`
+            : " Vuelve más tarde o elige otro módulo."}
+        </p>
       )}
 
       {pregunta && !feedback && (
