@@ -22,6 +22,30 @@ from backend.generation.client import GeneracionError, ProveedorNoSoportado
 
 
 def main() -> int:
+    """Lanza un lote de generación de preguntas 5/2/0/0.
+
+    Cómo: exige `--modulo` o `--all`. Comprueba limit, offset y k, inicializa
+    la base y carga las queries del YAML. En corrida real exige proveedor
+    `gemini` y `GOOGLE_API_KEY`. `generar_lote` hace el RAG, el umbral y las
+    llamadas. Un aborto por cuota del día sale con código 3; por API caída o
+    límite de minuto, con código 4.
+
+    Variables:
+        args.modulo: un código, o None si se pidió `--all`.
+        args.all: recorre los 13 módulos en orden.
+        args.limit: queries por módulo. Por defecto 20.
+        args.offset: queries iniciales que se saltan.
+        args.k: vecinos que pide el RAG. Por defecto 3.
+        args.dry_run: solo muestra fragmentos, sin llamar a Gemini.
+        args.entidad: organismo. Por defecto `pgn`.
+        todos: módulos sembrados.
+        elegidos: el módulo pedido o la lista completa.
+        queries: mapa código → frases.
+        resultado: acumulado del lote.
+
+    Devuelve: 0 al terminar, 1 por error de generación o de archivos, 2 por
+    argumentos o proveedor, 3 por cuota diaria, 4 por disponibilidad.
+    """
     parser = argparse.ArgumentParser(
         description="Genera ítems de práctica (5/2/0/0) con RAG + Gemini."
     )
@@ -57,7 +81,7 @@ def main() -> int:
     init_db()
     todos = listar_modulos(args.entidad)
     if not todos:
-        print("No hay módulos sembrados. Corre la app o init_db.", file=sys.stderr)
+        print("No hay módulos sembrados. Ejecuta init_db.", file=sys.stderr)
         return 1
 
     if args.all:

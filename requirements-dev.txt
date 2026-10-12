@@ -1,0 +1,3 @@
+# Tests y desarrollo local (no va a la imagen Render).
+-r requirements-web.txt
+pytest>=8.0.0

@@ -11,6 +11,21 @@ _MIN_CHARS = 500
 
 
 def extraer_texto(pdf_path: Path) -> str:
+    """Saca el texto seleccionable de un PDF oficial, página por página.
+
+    Cómo: abre el archivo con pdfplumber y concatena `extract_text` de cada
+    página. Luego aplasta espacios horizontales repetidos y deja como máximo
+    un renglón en blanco. Si el resultado tiene menos de 500 caracteres, el
+    PDF es una imagen escaneada y esta fase no hace OCR.
+
+    Variables:
+        pdf_path: ruta del PDF en disco.
+        paginas: texto de cada página, en orden. Una página sin texto aporta "".
+        texto: las páginas unidas y ya normalizadas.
+        _MIN_CHARS: mínimo de caracteres para aceptar el documento (500).
+
+    Devuelve: el texto plano del decreto o la ley.
+    """
     if not pdf_path.is_file():
         raise IngestError(f"No se encontró el PDF en: {pdf_path}")
 

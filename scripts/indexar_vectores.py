@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Embebe artículos de Postgres en Chroma. No se ejecuta al abrir Streamlit."""
+"""Embebe artículos de Postgres en Chroma. CLI admin; no corre en Render."""
 
 from __future__ import annotations
 
@@ -15,6 +15,18 @@ from backend.rag.index import IndexErrorRag, indexar_chunks
 
 
 def main() -> int:
+    """Embebe en Chroma los artículos que ya están en Postgres.
+
+    Cómo: llama a `indexar_chunks`. Sin `--reindex-all` solo procesa los que
+    tienen `chroma_id` vacío. Con el flag, vuelve a calcular todos los vectores.
+
+    Variables:
+        args.reindex_all: True para reembeber todo.
+        args.entidad: organismo. Por defecto `pgn`.
+        n: cuántos artículos se indexaron.
+
+    Devuelve: 0 si terminó, 1 si no hay artículos o falló el modelo.
+    """
     parser = argparse.ArgumentParser(
         description="Indexa vectores de los artículos ya guardados en Postgres."
     )

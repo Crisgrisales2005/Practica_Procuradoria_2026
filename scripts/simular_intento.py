@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simula responder un ítem (SRS). No llama a Gemini ni abre Streamlit."""
+"""Simula responder un ítem (SRS). No llama a Gemini."""
 
 from __future__ import annotations
 
@@ -17,6 +17,23 @@ from backend.srs import SrsError, marcar_dudoso, registrar_intento
 
 
 def main() -> int:
+    """Registra un intento o cambia la marca de dudoso desde la terminal.
+
+    Cómo: exige `--item-id` y exactamente una de estas acciones: `--puntaje`
+    0, 2 o 5, `--marcar-dudoso` o `--quitar-dudoso`. Inicializa la base y llama
+    a `registrar_intento` o a `marcar_dudoso`. Imprime el antes y el después
+    del calendario SRS.
+
+    Variables:
+        args.item_id: pregunta sobre la que se actúa.
+        args.puntaje: 5, 2 o 0, si se está respondiendo.
+        args.marcar_dudoso / args.quitar_dudoso: cambian `items.dudoso`.
+        res: diccionario que devuelve el servicio SRS.
+        u: unidad de repaso (norma, artículo, chunk, nivel).
+        a / d: estado SRS antes y después.
+
+    Devuelve: 0 si se guardó, 1 si el ítem o la base fallaron.
+    """
     parser = argparse.ArgumentParser(
         description="Registra un intento 5/2/0 o marca un ítem como dudoso."
     )

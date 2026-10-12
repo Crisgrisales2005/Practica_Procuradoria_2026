@@ -10,6 +10,17 @@ from backend.srs.sm2 import NIVEL_CASO, iso_utc, utc_now
 
 
 def _chunk_id_de_item(chunk_ids_raw: str | None) -> int | None:
+    """Lee el primer chunk_id del JSON del ítem, o None si no se puede.
+
+    Cómo: igual que en el registro de intentos, pero aquí un JSON roto o una
+    lista vacía no lanza error: la pregunta se salta al elegir la siguiente.
+
+    Variables:
+        chunk_ids_raw: texto de `items.chunk_ids`.
+        ids: lista parseada.
+
+    Devuelve: el id entero, o None.
+    """
     # asume 1 solo chunk_id; revisar si algún día se soportan ítems multi-fragmento
     try:
         ids = json.loads(chunk_ids_raw or "[]")
@@ -28,10 +39,14 @@ def siguiente_item(
     entidad: str = "pgn",
     modulo_codigo: str = "esp_08",
     excluir_ids: set[int] | frozenset[int] | None = None,
+    conn=None,
 ) -> dict[str, Any] | None:
+    """Elige la próxima pregunta. Si `conn` se pasa, no abre otra."""
     ahora = iso_utc(utc_now())
     omitidos = set(excluir_ids or ())
-    conn = get_connection()
+    own = conn is None
+    if own:
+        conn = get_connection()
     try:
         mod = conn.execute(
             """
@@ -131,7 +146,8 @@ def siguiente_item(
             return out
         return None
     finally:
-        conn.close()
+        if own:
+            conn.close()
 
 
 def listar_srs_modulo(
@@ -139,6 +155,19 @@ def listar_srs_modulo(
     entidad: str = "pgn",
     modulo_codigo: str = "esp_08",
 ) -> list[dict[str, Any]]:
+    """Lista los calendarios de repaso cuyo último intento fue en ese módulo.
+
+    Cómo: une `srs_estado` con `modulos` y filtra por el código. El orden es
+    por `next_due` (los vacíos al final) y luego por número de artículo.
+    Como `modulo_id` se actualiza en cada intento, aquí se ve el módulo que
+    tocó el tema por última vez, no todos los módulos del artículo.
+
+    Variables:
+        entidad: organismo. Por defecto `pgn`.
+        modulo_codigo: código del temario. Por defecto `esp_08`.
+
+    Devuelve: filas con ease, intervalo, reps, lapses, next_due y artículo.
+    """
     conn = get_connection()
     try:
         rows = conn.execute(

@@ -15,6 +15,21 @@ from backend.rag.retrieve import recuperar
 
 
 def main() -> int:
+    """Busca artículos parecidos a una frase y los imprime, sin generar preguntas.
+
+    Cómo: llama a `recuperar` con el módulo, la frase y `k`. Cada hit muestra
+    artículo, norma, score y un extracto de hasta 280 caracteres.
+
+    Variables:
+        args.modulo: código, por ejemplo `esp_08`.
+        args.query: texto de la consulta.
+        args.k: cuántos vecinos pedir. Por defecto 5.
+        args.entidad: organismo. Por defecto `pgn`.
+        hits: lista de `Hit`.
+        extracto: texto del artículo en una línea, recortado.
+
+    Devuelve: 0 si consultó (aunque no haya resultados), 1 si Chroma o el modelo fallaron.
+    """
     parser = argparse.ArgumentParser(description="Recupera k artículos por módulo.")
     parser.add_argument("--modulo", required=True, help="Código, ej. esp_08")
     parser.add_argument("--query", required=True)

@@ -10,11 +10,24 @@ BATCH_SIZE = 32
 
 
 class IndexErrorRag(Exception):
-    """No hay chunks para embeber o falló el índice."""
+    """No hay artículos en Postgres para embeber, o el índice no pudo arrancar."""
 
 
 def _listar_chunks(entidad: str, solo_pendientes: bool) -> list[dict]:
-    """Una fila por (chunk, módulo) vía chunk_modulos; fallback a chunks.modulo_id."""
+    """Lista artículos unidos a cada módulo al que pertenecen.
+
+    Cómo: parte de `chunk_modulos`, así un mismo artículo (Ley 594) sale una
+    vez por módulo. Si `solo_pendientes` es verdadero, se queda con los que
+    todavía tienen `chroma_id` vacío.
+
+    Variables:
+        entidad: organismo, por ejemplo `pgn`.
+        solo_pendientes: True para indexar solo lo nuevo; False para traer todos.
+        sql: la consulta, a la que se le añade el filtro y el ORDER BY.
+        params: valores de la consulta; el primero es `entidad`.
+
+    Devuelve: filas con texto, norma, artículo, código de módulo y `chroma_id`.
+    """
     sql = """
         SELECT
             c.id,
@@ -45,6 +58,16 @@ def _listar_chunks(entidad: str, solo_pendientes: bool) -> list[dict]:
 
 
 def _marcar_chroma_ids(chunk_ids: list[int]) -> None:
+    """Anota en Postgres que esos artículos ya tienen vector.
+
+    Cómo: guarda `str(id)` en `chunks.chroma_id`. El id real dentro de Chroma
+    es `id__modulo`, pero esta columna solo marca «ya indexado» para no
+    reembeber el mismo texto en la próxima corrida.
+
+    Variables:
+        chunk_ids: ids de Postgres del lote que acaba de subirse a Chroma.
+        cid: un id de ese lote.
+    """
     if not chunk_ids:
         return
     conn = get_connection()
@@ -60,6 +83,31 @@ def _marcar_chroma_ids(chunk_ids: list[int]) -> None:
 
 
 def indexar_chunks(*, entidad: str = "pgn", reindex_all: bool = False) -> int:
+    """Convierte artículos de Postgres en vectores y los guarda en Chroma.
+
+    Cómo: inicializa la base y lista los chunks pendientes (o todos, si
+    `reindex_all`). Agrupa las filas por `chunk_id` para embeber el texto una
+    sola vez aunque el artículo pertenezca a varios módulos. Cada lote de 32
+    textos se vectoriza y se sube con un id `chunkId__moduloCodigo` por módulo,
+    reutilizando el mismo vector. Después marca esos ids en Postgres.
+
+    Variables:
+        entidad: organismo. Por defecto `pgn`.
+        reindex_all: True vuelve a embeber aunque `chroma_id` ya tenga valor.
+        pendientes: filas (chunk, módulo) que entran en esta corrida.
+        todos: todos los artículos, solo para distinguir «no hay nada» de «ya está hecho».
+        by_chunk: mapa de id de chunk a sus filas (una por módulo).
+        collection: colección Chroma.
+        indexados: cuántos chunks (no entradas de módulo) se procesaron.
+        lote_ids: hasta 32 ids de este lote.
+        textos: un texto por chunk, tomado de la primera fila del grupo.
+        vectores: embeddings, en el mismo orden que `lote_ids`.
+        chroma_id: id compuesto `id__codigo` para que el mismo artículo viva
+            en varios módulos sin pisarse.
+
+    Devuelve: cuántos artículos se embebieron. Cero si ya estaban todos marcados.
+    Lanza: `IndexErrorRag` si Postgres no tiene ningún artículo.
+    """
     init_db()
     pendientes = _listar_chunks(entidad, solo_pendientes=not reindex_all)
     if not pendientes:

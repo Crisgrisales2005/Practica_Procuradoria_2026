@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingesta CLI. No se ejecuta al abrir Streamlit."""
+"""Ingesta CLI. No corre en la imagen de Render."""
 
 from __future__ import annotations
 
@@ -16,6 +16,21 @@ from backend.ingest.run import ingerir_desde_manifiesto
 
 
 def main() -> int:
+    """Indexa en Postgres el PDF que indica un manifiesto.
+
+    Cómo: resuelve la ruta del YAML (relativa a la raíz del repo si no es
+    absoluta) y llama a `ingerir_desde_manifiesto`. Traduce la acción
+    `ya_indexado`, `reindexado` o `insertado` a una frase e imprime cuántos
+    artículos quedaron y sus números.
+
+    Variables:
+        args.manifest: ruta del YAML, obligatoria.
+        manifest: ruta absoluta.
+        resultado: `ResultadoIngesta`.
+        etiquetas: nombre legible de cada acción.
+
+    Devuelve: 0 si se guardó, 1 si el PDF, el manifiesto o el módulo fallaron.
+    """
     parser = argparse.ArgumentParser(
         description="Indexa un PDF normativo en Postgres (por artículo)."
     )

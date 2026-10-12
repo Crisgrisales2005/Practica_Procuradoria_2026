@@ -16,6 +16,20 @@ from backend.srs import siguiente_item
 
 
 def main() -> int:
+    """Muestra la próxima pregunta que tocaría practicar, sin abrir la app.
+
+    Cómo: inicializa la base y llama a `siguiente_item`. Imprime el motivo
+    (`vencido` o `nuevo`), el id, el artículo y un enunciado recortado a 160
+    caracteres. Si es un repaso vencido, también imprime el calendario.
+
+    Variables:
+        args.modulo: código. Por defecto `esp_08`.
+        args.entidad: organismo. Por defecto `pgn`.
+        item: la fila elegida, o None.
+        enunciado: texto de la pregunta en una sola línea.
+
+    Devuelve: 0. Si no hay pendientes, imprime `sin pendientes`.
+    """
     parser = argparse.ArgumentParser(
         description="Elige el siguiente ítem (SRS): vencidos antes que nuevos."
     )
