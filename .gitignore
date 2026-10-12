@@ -1,15 +1,19 @@
 .env
+!.env.example
+
 .venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+node_modules/
 
-data/sqlite/*
-!data/sqlite/.gitkeep
-data/chroma/*
-!data/chroma/.gitkeep
-data/hf_cache/*
-!data/hf_cache/.gitkeep
+*.db
+*.log
 
-.env
+data/
+documentos_entidades/
+hf_cache/
+
+dist/
+build/
