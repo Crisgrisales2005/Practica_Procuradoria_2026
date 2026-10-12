@@ -25,6 +25,25 @@ _VACIO = {
 
 
 def _parse_opciones(raw: str | None, *, con_justificacion: bool) -> list[dict[str, Any]]:
+    """Convierte el JSON de opciones en cuatro filas A, B, C y D.
+
+    Cómo: exige una lista de exactamente 4 objetos. Cada uno necesita letra
+    A–D sin repetir, texto, y puntaje 5, 2 o 0. Si `con_justificacion` es
+    verdadero (la matriz de corrección), cada opción además necesita
+    `justificacion`. El resultado se ordena por letra.
+
+    Variables:
+        raw: texto JSON de `opciones_json` o de `matriz_json`.
+        con_justificacion: True cuando se lee la matriz que se muestra tras responder.
+        data: lista ya parseada.
+        letras: letras vistas, para detectar duplicados.
+        op: una opción cruda del JSON.
+        letra, texto, puntaje: campos ya validados.
+        fila: opción limpia que entra en la lista de salida.
+        just: justificación, solo si se pidió.
+
+    Devuelve: cuatro diccionarios ordenados A, B, C, D.
+    """
     try:
         data = json.loads(raw or "[]")
     except json.JSONDecodeError as exc:
@@ -65,9 +84,9 @@ def _parse_opciones(raw: str | None, *, con_justificacion: bool) -> list[dict[st
     return out
 
 
-def item_completo_para_practica(item_id: int) -> dict[str, Any]:
-    """Carga el ítem con opciones y matriz parseadas. Lanza SrsError si falta matriz."""
-    row = obtener_item(item_id)
+def item_completo_para_practica(item_id: int, *, conn=None) -> dict[str, Any]:
+    """Carga pregunta + opciones + matriz. Si `conn` se pasa, no abre otra."""
+    row = obtener_item(item_id, conn=conn)
     if row is None:
         raise SrsError(f"No existe el ítem {item_id}")
     opciones = _parse_opciones(row.get("opciones_json"), con_justificacion=False)
@@ -82,10 +101,13 @@ def resumen_practica_modulo(
     *,
     entidad: str = "pgn",
     modulo_codigo: str = "esp_08",
+    conn=None,
 ) -> dict[str, int]:
-    """Conteos legibles + aciertos de práctica (puntaje 5 / total intentos)."""
+    """Cuenta cola y notas de un módulo. Si `conn` se pasa, no abre otra."""
     ahora = iso_utc(utc_now())
-    conn = get_connection()
+    own = conn is None
+    if own:
+        conn = get_connection()
     try:
         mod = conn.execute(
             """
@@ -172,7 +194,8 @@ def resumen_practica_modulo(
             "fallos": int(intentos["fallos"] or 0),
         }
     finally:
-        conn.close()
+        if own:
+            conn.close()
 
 
 def ultimos_intentos_modulo(
@@ -180,11 +203,14 @@ def ultimos_intentos_modulo(
     entidad: str = "pgn",
     modulo_codigo: str = "esp_08",
     limit: int = 8,
+    conn=None,
 ) -> list[dict[str, Any]]:
-    """Últimos intentos del módulo (más recientes primero). Solo lectura."""
+    """Trae los intentos más recientes de un módulo. Si `conn` se pasa, no abre otra."""
     if limit < 1:
         return []
-    conn = get_connection()
+    own = conn is None
+    if own:
+        conn = get_connection()
     try:
         rows = conn.execute(
             """
@@ -200,4 +226,5 @@ def ultimos_intentos_modulo(
         ).fetchall()
         return [dict(r) for r in rows]
     finally:
-        conn.close()
+        if own:
+            conn.close()

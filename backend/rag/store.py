@@ -9,6 +9,19 @@ COLLECTION_NAME = "pgn_articulos"
 
 
 def get_collection():
+    """Abre (o crea) la colección Chroma guardada en disco.
+
+    Cómo: asegura la carpeta de Chroma y abre un `PersistentClient` en esa ruta.
+    El espacio de la colección es coseno: la distancia mide ángulo entre vectores,
+    que es lo que luego se convierte en `Hit.score`. El nombre sale de
+    `settings.chroma_collection` o, si viene vacío, de `pgn_articulos`.
+
+    Variables:
+        nombre: nombre de la colección.
+        client: cliente Chroma apuntando a la carpeta local.
+
+    Devuelve: la colección lista para `query` o `upsert`.
+    """
     try:
         import chromadb
     except ImportError as exc:

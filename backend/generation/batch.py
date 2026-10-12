@@ -34,6 +34,21 @@ QUERIES_PATH = (
 
 @dataclass
 class ResultadoLote:
+    """Acumulado de una corrida de generación.
+
+    Variables:
+        ok: ítems guardados.
+        omitidos_sin_rag: queries cuyo mejor artículo no superó el umbral.
+        omitidos_advertencia: el modelo dijo que el fragmento no alcanzaba.
+        fail_json: respuestas que no pasaron la validación tras 3 intentos.
+        n_429_minuto: reintentos por límite de minuto.
+        n_disponibilidad: reintentos por error 5xx.
+        detenido_por_cuota_diaria: la corrida paró porque se acabó la cuota del día.
+        detenido_por_disponibilidad: paró por tres 5xx seguidos.
+        ids_insertados: ids nuevos en `items`.
+        llamadas_api: llamadas a Gemini, contando reintentos de formato.
+        ultimo_modulo / ultima_query: dónde quedó la corrida si se detuvo.
+    """
     ok: int = 0
     omitidos_sin_rag: int = 0
     omitidos_advertencia: int = 0
@@ -48,6 +63,14 @@ class ResultadoLote:
     ultima_query: str = ""
 
     def resumen(self) -> str:
+        """Arma el texto de cierre con conteos y si la corrida se detuvo.
+
+        Variables:
+            diario: `sí` o `no`, según `detenido_por_cuota_diaria`.
+            disp: `sí` o `no`, según `detenido_por_disponibilidad`.
+
+        Devuelve: dos líneas: los conteos y la estimación de llamadas (techo 500 al día).
+        """
         diario = "sí" if self.detenido_por_cuota_diaria else "no"
         disp = "sí" if self.detenido_por_disponibilidad else "no"
         return (
@@ -62,13 +85,42 @@ class ResultadoLote:
 
 
 class LoteAbortado(Exception):
+    """La corrida se cortó por cuota diaria, límite por minuto o API caída.
+
+    Variables:
+        motivo: `cuota_dia`, `cuota_minuto` o `disponibilidad`.
+        resultado: el `ResultadoLote` con lo que ya se había guardado.
+    """
+
     def __init__(self, motivo: str, resultado: ResultadoLote) -> None:
+        """Guarda el motivo y el acumulado para que el script decida el código de salida.
+
+        Variables:
+            motivo: por qué se abortó.
+            resultado: conteos e ids ya insertados.
+        """
         self.motivo = motivo
         self.resultado = resultado
         super().__init__(motivo)
 
 
 def cargar_queries(path: Path | None = None) -> dict[str, list[str]]:
+    """Lee las consultas de generación, agrupadas por código de módulo.
+
+    Cómo: abre el YAML (por defecto `manifests/queries_generacion.yaml`), toma
+    el mapa `modulos` y se queda con las frases que no están vacías.
+
+    Variables:
+        path: otro YAML, si se quiere. None usa `QUERIES_PATH`.
+        archivo: ruta que se lee de verdad.
+        data: documento YAML.
+        modulos: mapa código → lista de frases.
+        out: el mismo mapa, ya limpiado.
+        codigo: clave del módulo.
+        queries: lista cruda de ese módulo.
+
+    Devuelve: por ejemplo `{"esp_08": ["funciones del Procurador", ...]}`.
+    """
     archivo = path or QUERIES_PATH
     data = yaml.safe_load(archivo.read_text(encoding="utf-8")) or {}
     modulos = data.get("modulos") or {}
@@ -81,7 +133,21 @@ def cargar_queries(path: Path | None = None) -> dict[str, list[str]]:
 
 
 def hits_por_umbral(hits: list[Hit], min_score: float, max_inyectar: int = 1) -> list[Hit]:
-    """Devuelve como máximo un hit (el de mayor score que supera el umbral)."""
+    """Se queda con el artículo que supera el umbral, como máximo uno.
+
+    Cómo: filtra los hits con `score >= min_score`. Chroma ya los trae del más
+    parecido al menos parecido, así que el primero que pasa es el mejor.
+    `max_inyectar` existe por compatibilidad, pero el corte final es siempre 1:
+    cada ítem se redacta con un solo artículo.
+
+    Variables:
+        hits: resultados de `recuperar`, ordenados por score.
+        min_score: umbral, normalmente `RAG_MIN_SCORE` (0.35).
+        max_inyectar: tope pedido. El valor efectivo queda en 1.
+        ok: hits que superan el umbral.
+
+    Devuelve: una lista de 0 o 1 hit.
+    """
     ok = [h for h in hits if h.score >= min_score]
     if not ok:
         return []
@@ -89,14 +155,36 @@ def hits_por_umbral(hits: list[Hit], min_score: float, max_inyectar: int = 1) ->
 
 
 def _log(linea: str) -> None:
-    settings.ensure_sqlite_dir()
-    path = settings.sqlite_dir / "generation.log"
+    """Añade una línea con fecha UTC a `data/logs/generation.log`.
+
+    Cómo: crea la carpeta si falta y abre el archivo en modo añadir.
+
+    Variables:
+        linea: mensaje, por ejemplo un FAIL o un omitido.
+        path: ruta del log.
+        stamp: fecha UTC del renglón.
+    """
+    settings.ensure_logs_dir()
+    path = settings.logs_dir / "generation.log"
     stamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     with path.open("a", encoding="utf-8") as fh:
         fh.write(f"{stamp} {linea}\n")
 
 
 def _esperar_espaciado(ultimo_inicio: float | None) -> float:
+    """Espera lo que falte para separar las llamadas a Gemini 7 segundos.
+
+    Cómo: compara el reloj monotónico con `ultimo_inicio`. Si han pasado menos
+    de `ESPACIADO_SEGUNDOS` (7), duerme la diferencia. La primera llamada, con
+    `ultimo_inicio` en None, no espera.
+
+    Variables:
+        ultimo_inicio: instante monotónico en que empezó la llamada anterior, o None.
+        ahora: instante actual.
+        falta: segundos que todavía hay que dormir.
+
+    Devuelve: el instante en que esta llamada puede empezar.
+    """
     ahora = time.monotonic()
     if ultimo_inicio is not None:
         falta = ESPACIADO_SEGUNDOS - (ahora - ultimo_inicio)
@@ -116,9 +204,33 @@ def generar_un_item(
     dry_run: bool,
     ultimo_inicio: float | None,
 ) -> tuple[str, int | None, int, int, int, float | None]:
-    """Devuelve (estado, item_id, llamadas, n_429, n_disp, nuevo_ultimo_inicio).
+    """Redacta y guarda una pregunta a partir de una query y su artículo.
 
-    estado: ok | advertencia | fail_json | cuota_dia | cuota_minuto | disponibilidad
+    Cómo: en dry-run no llama a la API. En una corrida real arma el mensaje,
+    espera el espaciado de 7 segundos y pide JSON. Si la validación falla,
+    reintenta hasta 3 veces (`MAX_INTENTOS_FORMATO`). Una advertencia del modelo
+    omite el ítem. Un JSON válido se guarda con `guardar_item`.
+
+    Variables:
+        modulo_codigo: módulo de la query.
+        query: frase de búsqueda que se usó en el RAG.
+        hits: artículos que superaron el umbral. Se usa el primero.
+        system: prompt maestro XML.
+        entidad: organismo que se escribe en `items`.
+        dry_run: True evita la llamada y el INSERT.
+        ultimo_inicio: instante de la llamada anterior, para el espaciado.
+        user: mensaje de usuario armado con el fragmento.
+        llamadas: cuántas veces se llamó a Gemini en esta pregunta.
+        n_429 / n_disp: reintentos por minuto y por disponibilidad.
+        ultimo: instante actualizado tras cada espera.
+        ultima_razon: `json` o `citas`, la del último fallo de formato.
+        raw: texto devuelto por el modelo.
+        item: ítem ya validado.
+        item_id: id insertado cuando el estado es `ok`.
+
+    Devuelve: `(estado, item_id, llamadas, n_429, n_disp, nuevo_ultimo_inicio)`.
+    `estado` es `dry_run`, `ok`, `advertencia`, `fail_json`, `cuota_dia`,
+    `cuota_minuto` o `disponibilidad`. `item_id` solo viene en `ok`.
     """
     if dry_run:
         return "dry_run", None, 0, 0, 0, ultimo_inicio
@@ -175,6 +287,34 @@ def generar_lote(
     offset: int = 0,
     min_score: float | None = None,
 ) -> ResultadoLote:
+    """Recorre módulos y queries: busca, filtra por umbral, genera y acumula.
+
+    Cómo: toma de cada módulo las queries desde `offset` hasta `offset + limit`.
+    Recupera `k` artículos y se queda con uno si supera el umbral. Por debajo
+    del umbral cuenta un omitido y sigue. En dry-run imprime el fragmento y no
+    llama a Gemini. En corrida real delega en `generar_un_item`. Cuota diaria,
+    límite por minuto o tres 5xx lanzan `LoteAbortado` con lo ya guardado.
+
+    Variables:
+        modulos: filas de `modulos`, cada una con `codigo`.
+        queries_por_modulo: mapa código → frases, de `cargar_queries`.
+        limit: cuántas queries usar por módulo.
+        k: cuántos vecinos pide el RAG antes del umbral.
+        entidad: organismo.
+        dry_run: True muestra fragmentos y no llama a la API.
+        offset: cuántas queries iniciales se saltan, para continuar un lote.
+        min_score: umbral. None usa `settings.rag_min_score`.
+        umbral: el número que se aplica de verdad.
+        resultado: acumulado que se va llenando.
+        system: XML maestro, o texto vacío en dry-run.
+        ultimo_inicio: reloj para separar llamadas 7 segundos.
+        codigo: módulo de este ciclo.
+        seleccion: el recorte de queries de ese módulo.
+        hits / usables: vecinos crudos y el que pasó el umbral.
+        estado / item_id / llamadas / n_429 / n_disp: lo que devolvió una pregunta.
+
+    Devuelve: el `ResultadoLote` al terminar todas las queries.
+    """
     umbral = settings.rag_min_score if min_score is None else min_score
     resultado = ResultadoLote()
     system = "" if dry_run else cargar_system_prompt()

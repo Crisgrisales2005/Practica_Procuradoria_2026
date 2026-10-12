@@ -14,6 +14,15 @@ from backend.ingest.errors import IngestError
 
 @dataclass(frozen=True)
 class ResultadoIngesta:
+    """Qué pasó al guardar un PDF en Postgres.
+
+    Variables:
+        accion: `ya_indexado` (mismo hash), `reindexado` (mismo nombre, otro
+            archivo) o `insertado` (documento nuevo).
+        documento_id: id de la fila en `documentos`.
+        n_chunks: cuántos artículos quedaron asociados a ese documento.
+        articulos: números de artículo, en el orden guardado.
+    """
     accion: str  # ya_indexado | reindexado | insertado
     documento_id: int
     n_chunks: int
@@ -21,6 +30,18 @@ class ResultadoIngesta:
 
 
 def sha256_archivo(path: Path) -> str:
+    """Calcula el SHA-256 del archivo leyéndolo de a 1 MB.
+
+    Cómo: no carga el PDF entero en memoria. Actualiza el hash con cada bloque
+    hasta que `read` devuelve bytes vacíos.
+
+    Variables:
+        path: ruta del PDF.
+        digest: acumulador del hash.
+        bloque: el trozo de hasta 1 MB recién leído.
+
+    Devuelve: el hash en hexadecimal, que se guarda en `documentos.sha256`.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as fh:
         for bloque in iter(lambda: fh.read(1024 * 1024), b""):
@@ -29,6 +50,17 @@ def sha256_archivo(path: Path) -> str:
 
 
 def _resolver_modulo_id(conn, entidad: str, codigo: str) -> int:
+    """Traduce un código de módulo (`esp_08`) al id numérico de la tabla `modulos`.
+
+    Variables:
+        conn: conexión abierta.
+        entidad: organismo, por ejemplo `pgn`.
+        codigo: código del temario.
+        row: la fila encontrada, o None.
+
+    Devuelve: `modulos.id`.
+    Lanza: `IngestError` si el código no está en la semilla.
+    """
     row = conn.execute(
         "SELECT id FROM modulos WHERE entidad = %s AND codigo = %s",
         (entidad, codigo),
@@ -49,6 +81,31 @@ def persistir_chunks(
     modulo_codigos: list[str],
     chunks: list[ArticuloChunk],
 ) -> ResultadoIngesta:
+    """Guarda los artículos y decide si el PDF es nuevo, repetido o reemplazo.
+
+    Cómo, dentro de una transacción:
+    1. Resuelve cada código de módulo a su id. El primero (`canonico`) es el
+       que se copia a `chunks.modulo_id`; todos se enlazan en `chunk_modulos`.
+    2. Si ya hay un documento con el mismo SHA-256, no reescribe los artículos:
+       solo asegura los enlaces de módulo y devuelve `ya_indexado`.
+    3. Si el nombre de archivo ya existe pero el hash cambió, borra los chunks
+       viejos, actualiza hash y fecha, inserta los nuevos y devuelve `reindexado`.
+    4. Si no hay coincidencia, inserta el documento y los artículos (`insertado`).
+    Un error hace `rollback`. Al final la conexión vuelve al pool.
+
+    Variables:
+        entidad: organismo dueño del PDF.
+        nombre_archivo: nombre del archivo, sin carpetas.
+        sha256: hash calculado por `sha256_archivo`.
+        modulo_codigos: códigos del manifiesto, al menos uno.
+        chunks: artículos ya partidos.
+        ahora: fecha UTC de la carga, en texto ISO.
+        articulos: números de artículo de esta corrida.
+        modulo_ids: ids numéricos, en el mismo orden que los códigos.
+        canonico: primer módulo; queda en la columna histórica `chunks.modulo_id`.
+        mismo_hash / mismo_nombre: fila previa, si existe.
+        doc_id: id del documento nuevo o reutilizado.
+    """
     if not modulo_codigos:
         raise IngestError("se requiere al menos un módulo en el manifiesto")
     ahora = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -139,6 +196,19 @@ def persistir_chunks(
 
 
 def _asegurar_chunk_modulos(conn, documento_id: int, modulo_ids: list[int]) -> None:
+    """Enlaza los artículos de un documento ya guardado con los módulos pedidos.
+
+    Cómo: lista los `chunks.id` de ese documento e inserta cada par
+    (chunk, módulo) en `chunk_modulos`. `ON CONFLICT DO NOTHING` evita duplicar
+    la clave primaria si el enlace ya estaba.
+
+    Variables:
+        conn: conexión abierta, dentro de la transacción de `persistir_chunks`.
+        documento_id: id en `documentos`.
+        modulo_ids: módulos a los que debe pertenecer cada artículo.
+        cid: id de un chunk.
+        mid: id de un módulo.
+    """
     chunk_ids = conn.execute(
         "SELECT id FROM chunks WHERE documento_id = %s",
         (documento_id,),
@@ -164,6 +234,21 @@ def _insertar_chunks(
     chunks: list[ArticuloChunk],
     modulo_ids: list[int],
 ) -> None:
+    """Inserta cada artículo y sus enlaces de módulo.
+
+    Cómo: una fila en `chunks` por artículo, con `chroma_id` vacío (el vector
+    se calcula después). Luego una fila en `chunk_modulos` por cada módulo.
+
+    Variables:
+        conn: conexión abierta.
+        documento_id: documento padre.
+        entidad: se copia a cada chunk para filtrar búsquedas.
+        modulo_canonico: módulo que queda en `chunks.modulo_id`.
+        chunks: artículos a insertar.
+        modulo_ids: todos los módulos del manifiesto, incluido el canónico.
+        cid: id recién generado del chunk.
+        mid: cada módulo al que se enlaza ese chunk.
+    """
     for chunk in chunks:
         row = conn.execute(
             """
