@@ -26,12 +26,40 @@ items:
     ingerir: true
     norma: Ley 1437 de 2011
 
+  - archivo: acuerdo_060_2001_comunicaciones_oficiales.pdf
+    url: "https://normativa.archivogeneral.gov.co/acuerdo-060-de-2001/?pdf=404"
+    tipo: pdf
+    modulos: [esp_04]
+    ingerir: true
+    norma: Acuerdo 060 de 2001 (AGN) — comunicaciones oficiales
+
+  - archivo: guia_elaboracion_documentos_dafp.pdf
+    url: "https://www1.funcionpublica.gov.co/documents/34645357/34703150/guia-elaboracion-actualizacion-documentos.pdf/0459c896-637a-4886-9e1f-9dec7c37e14b"
+    tipo: pdf
+    modulos: [esp_04]
+    ingerir: true
+    norma: Guía para la elaboración o actualización de documentos (DAFP)
+
+  - archivo: protocolo_servicio_ciudadania_pgn.pdf
+    url: "https://www.procuraduria.gov.co/Documents/2025/Junio/Protocolo%20de%20Atenci%c3%b3n.pdf"
+    tipo: pdf
+    modulos: [esp_05]
+    ingerir: true
+    norma: Protocolo de Servicio a la Ciudadanía (PGN)
+
   - archivo: ley_594_2000_archivos.pdf
     url: "https://normativa.archivogeneral.gov.co/ley-594-de-2000/?pdf=41"
     tipo: pdf
     modulos: [esp_06, com_13]
     ingerir: true
     norma: Ley 594 de 2000
+
+  - archivo: ley_1581_2012_datos_personales.pdf
+    url: "https://www.funcionpublica.gov.co/eva/gestornormativo/norma_pdf.php?i=49981"
+    tipo: pdf
+    modulos: [esp_07]
+    ingerir: true
+    norma: Ley Estatutaria 1581 de 2012 (protección de datos personales)
 
   - archivo: codigo_general_disciplinario_1952_2094.pdf
     url: "https://iemp.gov.co/wp-content/uploads/2022/09/Co%CC%81digo-General-Disciplinario-edicio%CC%81n-bolsillo.pdf"
@@ -40,6 +68,20 @@ items:
     ingerir: true
     norma: Código General Disciplinario (Ley 1952 de 2019 y Ley 2094 de 2021)
 
+  - archivo: decreto_ley_262_2000.pdf
+    url: "https://www.funcionpublica.gov.co/eva/gestornormativo/norma_pdf.php?i=40618"
+    tipo: pdf
+    modulos: [esp_08, com_10]
+    ingerir: true
+    norma: Decreto Ley 262 de 2000 (estructura y organización de la PGN)
+
+  - archivo: ley_489_1998_organizacion_estado.pdf
+    url: "https://www.funcionpublica.gov.co/eva/gestornormativo/norma_pdf.php?i=186"
+    tipo: pdf
+    modulos: [com_09]
+    ingerir: true
+    norma: Ley 489 de 1998 (organización y funcionamiento de la Administración Pública)
+
   - archivo: manual_mipg_v6_1.pdf
     url: "https://www1.funcionpublica.gov.co/documents/28587410/57410531/2026-02-10_Documento_manual_operativo_mdi_v6.1.pdf"
     tipo: pdf
@@ -47,17 +89,17 @@ items:
     ingerir: true
     norma: Manual Operativo del Modelo Integrado de Planeación y Gestión (MIPG) v6.1
 
-  # HTML: se descargan; NO se ingieren en Fase 8 (sin chunking por artículo).
+  # HTML de respaldo (no se ingieren: sin chunking por artículo).
   - archivo: protocolo_atencion_ciudadano.html
     url: "https://apps.procuraduria.gov.co/portal/media/file/protocolos_de_atencion_al_ciudadano/html/index-2.html"
     tipo: html
     modulos: [esp_05]
     ingerir: false
-    norma: Protocolos de atención al ciudadano (PGN)
+    norma: Protocolos de atención al ciudadano (PGN) — HTML legado
 
   - archivo: estructura_organica_pgn.html
     url: "https://www.procuraduria.gov.co/procuraduria/conozca-entidad/Pages/estructura.aspx"
     tipo: html
     modulos: [com_10]
     ingerir: false
-    norma: Estructura orgánica de la PGN
+    norma: Estructura orgánica de la PGN — HTML legado

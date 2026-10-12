@@ -114,9 +114,24 @@ python scripts/indexar_vectores.py --reindex-all
 
 ### Generar / revisar ítems
 
+Las frases están en [`manifests/queries_generacion.yaml`](manifests/queries_generacion.yaml) (~20 por módulo). Cada query puede producir un ítem si el RAG supera el umbral. La variedad diaria en la web la da el **banco + SRS**, no Gemini en Render.
+
+Corpus PDF (tras `descargar_normativa.py`): `esp_01`–`esp_08`, `com_09`, `com_10`, `com_12`, `com_13`. `com_11` (ofimática) sigue sin norma propia. Tras bajar/ingerir: `indexar_vectores.py --reindex-all` y luego `generar_items.py`.
+
 ```bash
-python scripts/generar_items.py --all --limit 15
+# Meta típica: ~20 ítems nuevos por módulo (cuota Gemini: puede cortar; continúa con --offset)
+python scripts/generar_items.py --modulo esp_01 --limit 20
+python scripts/generar_items.py --all --limit 20
+# Si cortó a mitad de esp_01 (p. ej. tras 10):
+python scripts/generar_items.py --modulo esp_01 --offset 10 --limit 10
 python scripts/revisar_items.py --last 5
+```
+
+Reiniciar progreso de tu padre (borra intentos/SRS; **no** borra el banco de preguntas):
+
+```bash
+python scripts/reset_practica.py          # dry-run (conteos)
+python scripts/reset_practica.py --confirm
 ```
 
 Diagnóstico local: scripts CLI (`consultar_rag.py`, etc.), no van a la imagen de Render.

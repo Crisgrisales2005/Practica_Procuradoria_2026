@@ -1,5 +1,6 @@
 # Queries escritas a mano para el lote de generación. No las produce el modelo.
-# Sin corpus ingerido (esp_04, esp_05 HTML, esp_07, com_09–11) el umbral RAG omite la query.
+# Meta: ~20 por módulo. Sin corpus ingerido (esp_04, esp_05 HTML, esp_07, com_09–11)
+# el umbral RAG omite la query hasta indexar.
 entidad: pgn
 modulos:
   esp_08:
@@ -27,47 +28,251 @@ modulos:
     - Constitución Política función pública
     - debido proceso administrativo
     - mecanismos de protección constitucional
+    - principios de la Administración Pública
+    - igualdad ante la ley en la función pública
+    - derecho de petición constitucional
+    - habeas data y protección de datos personales
+    - acción de tutela contra actos administrativos
+    - acción popular y de grupo
+    - control de constitucionalidad
+    - separación de poderes y Ministerio Público
+    - derechos fundamentales en el empleo público
+    - reserva de ley en materia sancionatoria
+    - publicidad de los actos administrativos
+    - buena fe y confianza legítima
+    - moralidad administrativa
+    - prevalencia del interés general
+    - derechos sociales y servicio público
+    - garantías del acusado en sede administrativa
+    - Constitución y carrera administrativa
   esp_02:
     - conciliación extrajudicial requisito de procedibilidad
     - rol del Ministerio Público en la conciliación
     - Estatuto de Conciliación
+    - Ley 2220 de 2022 conciliación
+    - centros de conciliación autorizados
+    - asuntos conciliables en lo contencioso administrativo
+    - asuntos no conciliables
+    - efectos del acuerdo conciliatorio
+    - homologación judicial del acuerdo
+    - agotamiento de la conciliación previa
+    - citación y comparecencia de las partes
+    - suspensión de términos por conciliación
+    - nulidad del acuerdo conciliatorio
+    - personero como conciliador
+    - Procuraduría en la conciliación extrajudicial
+    - conciliación en materia laboral administrativa
+    - conciliación en contratos estatales
+    - confidencialidad de la audiencia
+    - actas de conciliación
+    - rechazo o fracaso de la conciliación
   esp_03:
     - derecho de petición PQRSDF
     - silencio administrativo
     - recursos en la actuación administrativa
+    - CPACA Ley 1437 de 2011
+    - notificación de actos administrativos
+    - publicación y comunicación de actos
+    - revocatoria directa
+    - caducidad de la acción
+    - términos para resolver peticiones
+    - petición de documentos
+    - consulta y queja ante la administración
+    - recurso de reposición
+    - recurso de apelación administrativa
+    - recurso de queja
+    - medidas cautelares administrativas
+    - audiencia pública administrativa
+    - pruebas en el procedimiento administrativo
+    - nulidad y restablecimiento del derecho
+    - acción de cumplimiento
+    - silencio administrativo positivo y negativo
   esp_04:
     - elaboración de documentos de oficina
     - oficios y memorandos
     - estilo de comunicación oficial
+    - estructura de un oficio institucional
+    - circular interna y externa
+    - acta de reunión
+    - informe técnico administrativo
+    - redacciones claras y concisas
+    - tratamiento formal en correspondencia
+    - copias y destinatarios
+    - anexos y referencias documentales
+    - plantillas institucionales
+    - corrección de estilo en documentos oficiales
+    - confidencialidad en documentos de oficina
+    - radicación de documentos
+    - numeración y foliación
+    - notas internas
+    - comunicación entre dependencias
+    - errores frecuentes en redacción oficial
+    - tono institucional y respeto al ciudadano
   esp_05:
     - atención al usuario en la Procuraduría
     - trato digno al ciudadano
     - orientación de PQRSDF
+    - protocolo de atención al ciudadano
+    - canales de atención presencial y virtual
+    - tiempos de espera y turnos
+    - lenguaje claro al ciudadano
+    - atención preferencial
+    - registro de la solicitud del usuario
+    - remisión a la dependencia competente
+    - quejas por mala atención
+    - confidencialidad de datos del usuario
+    - orientación sobre competencias de la PGN
+    - atención a población vulnerable
+    - seguimiento a la solicitud del ciudadano
+    - buzón de sugerencias
+    - derechos del usuario del servicio
+    - deberes del servidor en ventanilla
+    - escalamiento de casos complejos
+    - cierre de la atención con claridad
   esp_06:
     - Ley 594 de 2000 archivo
     - tablas de retención documental
     - cadena de custodia de documentos
+    - ciclo vital del documento
+    - archivo de gestión
+    - archivo central
+    - archivo histórico
+    - clasificación documental
+    - ordenamiento y descripción
+    - transferencia documental
+    - eliminación de documentos
+    - conservación preventiva
+    - digitalización de archivos
+    - acceso a la información archivística
+    - instrumento archivístico TRD
+    - cuadros de clasificación documental
+    - correspondencia de entrada y salida
+    - radicación y control de correspondencia
+    - préstamo y consulta de expedientes
+    - responsabilidad del servidor frente al archivo
   esp_07:
     - bases de datos administrativas
     - registro de información
     - consulta de sistemas de información
+    - integridad de datos administrativos
+    - actualización de registros
+    - control de acceso a bases de datos
+    - confidencialidad de bases de datos
+    - respaldo y recuperación de información
+    - reportes y consultas frecuentes
+    - calidad de los datos cargados
+    - cruce de información entre sistemas
+    - errores de digitación y corrección
+    - trazabilidad de cambios en registros
+    - inventario de sistemas institucionales
+    - uso autorizado de sistemas de información
+    - exportación e importación de datos
+    - campos obligatorios en formularios
+    - auditoría de consultas
+    - protección de datos personales en BD
+    - soporte y escalamiento técnico
   com_09:
     - gestión pública y funcionamiento del Estado
     - principios de la función administrativa
     - organización del Estado colombiano
+    - ramas del poder público
+    - entidades del orden nacional
+    - descentralización administrativa
+    - planeación del desarrollo
+    - presupuesto público básico
+    - transparencia y acceso a la información
+    - control social a la gestión pública
+    - servicios públicos esenciales
+    - política pública y su ciclo
+    - coordinación interinstitucional
+    - eficiencia y eficacia administrativa
+    - economía en el gasto público
+    - responsabilidad de los servidores públicos
+    - MIPG modelo integrado de planeación
+    - indicadores de gestión
+    - rendición de cuentas
+    - lucha contra la corrupción administrativa
   com_10:
     - estructura de la Procuraduría General
     - organización y funciones de la PGN
     - Ministerio Público
+    - organigrama básico de la Procuraduría
+    - Procuradurías Delegadas competencias
+    - Procuradurías Regionales
+    - Procuradurías Provinciales
+    - personeros distritales y municipales
+    - relación PGN y Contraloría
+    - relación PGN y Defensoría del Pueblo
+    - sede central y desconcentración territorial
+    - funciones de prevención
+    - funciones de intervención
+    - funciones disciplinarias
+    - secretaría general de la PGN
+    - dependencias de apoyo misional
+    - canales institucionales de la PGN
+    - misión y visión institucional
+    - usuarios internos y externos de la PGN
+    - articulación con otras entidades del Estado
   com_11:
     - herramientas ofimáticas
     - hoja de cálculo
     - procesador de texto
+    - presentación de diapositivas
+    - correo electrónico institucional
+    - carpetas y archivos en el equipo
+    - formatos PDF en la oficina
+    - tablas y filtros en hojas de cálculo
+    - combinar correspondencia
+    - plantillas en procesador de texto
+    - atajos básicos de productividad
+    - seguridad de archivos ofimáticos
+    - impresión y exportación de documentos
+    - colaboración en documentos compartidos
+    - nombrado de archivos
+    - control de versiones simples
+    - gráficos básicos en hojas de cálculo
+    - listas y viñetas en informes
+    - firmas y revisión de cambios
+    - buenas prácticas de respaldo local
   com_12:
     - sistemas de gestión de calidad
     - control interno
     - mejora continua
+    - ciclo PHVA
+    - riesgos institucionales
+    - mapas de riesgos
+    - indicadores de calidad
+    - auditorías internas
+    - no conformidades y acciones correctivas
+    - acciones preventivas
+    - documentación del sistema de gestión
+    - procedimientos documentados
+    - política de calidad
+    - roles y responsabilidades en control interno
+    - autodiagnóstico institucional
+    - MIPG y dimensiones de gestión
+    - seguimiento a planes de mejora
+    - evidencia y trazabilidad de controles
+    - cultura de autocontrol
+    - reporte de hallazgos
   com_13:
     - gestión documental
     - correspondencia
     - archivo de gestión
+    - recepción de documentos
+    - distribución interna de correspondencia
+    - control de pendientes documentales
+    - expedientes administrativos
+    - foliación y orden original
+    - préstamo de carpetas
+    - devolución de documentos
+    - correspondencia confidencial
+    - medios electrónicos de gestión documental
+    - flujos de trámite documental
+    - tiempos de respuesta documentales
+    - inventario documental de oficina
+    - organización de bandejas de entrada
+    - conservación en el puesto de trabajo
+    - remisión al archivo central
+    - pérdida o extravío de documentos
+    - buenas prácticas del gestor documental
