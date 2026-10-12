@@ -1,185 +1,154 @@
 # Preparación Sustanciador 4SU-11 (PGN)
 
-Aplicación local para practicar casos situacionales del cargo **Sustanciador, código 4SU-11**, convocatoria 288-2026.
+Práctica de casos situacionales para el cargo **Sustanciador, código 4SU-11**, convocatoria 288-2026.
 
-Esta es la **fase 8**: descarga e ingesta de la normativa del temario (PDFs oficiales), tabla puente `chunk_modulos` para corpus compartidos (Ley 594 → `esp_06` + `com_13`) y SRS por unidad sin partir el repaso por módulo. La práctica en Streamlit (fase 7.2) sigue en Home. La base relacional vive en **Supabase (PostgreSQL)**; Chroma, embeddings y PDFs siguen en cada PC.
+**Fase 9:** interfaz web propia (FastAPI + React) desplegable en **Render**. La práctica es la SPA en `frontend/`. Ingesta, vectores y Gemini siguen en el PC de administración y escriben en el mismo Supabase.
 
-## Cómo levantarlo (cualquier PC)
+---
 
-1. Instala [Docker Desktop](https://www.docker.com/products/docker-desktop/) (en Windows incluye WSL2).
-2. En esta carpeta:
+## Publicar la práctica (sin saber programar)
 
-   ```bash
-   cp .env.example .env
-   ```
+1. Aplica una sola vez la migración SQL como admin (ver [scripts/sql/DRY_RUN_FASE9.md](scripts/sql/DRY_RUN_FASE9.md)). Necesitas `psql` y la contraseña del rol web en una variable de entorno (no va en el repo).
+2. Crea cuenta en [Render](https://render.com) y conecta este repositorio.
+3. Crea el Web Service desde `render.yaml` (Docker).
+4. Variables en Render (solo estas):
+   - `DATABASE_URL` — Session pooler con usuario **`procuradoria_web.<project_ref>`** y la contraseña que usaste en el SQL.
+   - `APP_PASSWORD` — **frase larga** de varias palabras (no un PIN corto). Es la contraseña que usará tu padre para entrar.
+   - `SESSION_SECRET` — déjala generar a Render, o pega un secreto largo aleatorio.
+5. Espera el build. Abre la URL de Render.
 
-3. Edita `.env`:
-   - `GOOGLE_API_KEY` — [Google AI Studio](https://aistudio.google.com/apikey)
-   - `DATABASE_URL` — connection string de Supabase en **Session mode (pooler)**. En el dashboard: *Connect* → *Session pooler* → URI. Debe verse un host `….pooler.supabase.com` (no solo `db.…supabase.co`: ese host suele ser **solo IPv6** y falla con `Network is unreachable` en muchas redes). Casa y trabajo usan **el mismo** valor.
-4. Arranca:
+**Arranque en frío (importante):** con el plan free, si el servicio estuvo dormido, la **primera visita del día** muestra la pantalla de espera de **Render** (gris), no la nuestra. Puede tardar cerca de un minuto. Cuando la app ya cargó y solo la base está fría, verás dentro de la página «Despertando el servidor…» / «Conectando con la base…».
 
-   ```bash
-   docker compose up --build
-   ```
+**Data API de Supabase (opcional):** en el dashboard del proyecto, si aparece la opción de desactivar la Data API / API REST, desactívala. Esta app no la usa; la migración ya cierra `anon`/`authenticated` con RLS.
 
-   La **primera** construcción es lenta (PyTorch + modelo de embeddings ~1 GB en `data/hf_cache/`). Conviene tener **16 GB de RAM**.
+---
 
-5. Abre [http://localhost:8501](http://localhost:8501).
+## Migración Fase 9 (admin, una vez)
 
-Si el proyecto free de Supabase estaba dormido, la primera conexión puede tardar ~1 minuto (la app reintenta sola). Si falla del todo: abre el dashboard de Supabase, espera a que despierte y recarga.
+Antes de aplicar, haz un dump local de la base (carpeta `backups/` es solo en tu máquina, no va al repo). Scripts:
 
-Para detenerlo: `Ctrl+C`, o `docker compose down`.
+| Archivo | Uso |
+|---|---|
+| [scripts/sql/migrate_fase9_web.sql](scripts/sql/migrate_fase9_web.sql) | Forward |
+| [scripts/sql/migrate_fase9_web_rollback.sql](scripts/sql/migrate_fase9_web_rollback.sql) | Reversa |
+| [scripts/sql/DRY_RUN_FASE9.md](scripts/sql/DRY_RUN_FASE9.md) | Dry-run `BEGIN…ROLLBACK` y apply |
 
-## Primera vez en Supabase (solo en el PC que tiene el `app.db` viejo)
+```bash
+export PROCURADORIA_WEB_PASSWORD='tu frase larga aquí'
+export ADMIN_DATABASE_URL='postgresql://postgres.<ref>:…@….pooler.supabase.com:5432/postgres'
 
-1. Crea un proyecto free en [Supabase](https://supabase.com) y copia `DATABASE_URL` al `.env`.
-2. Migra el SQLite local (269 artículos, ítems si los hay), **preservando IDs**:
+# Dry-run primero (ver DRY_RUN_FASE9.md), luego:
+psql "$ADMIN_DATABASE_URL" \
+  -v ON_ERROR_STOP=1 \
+  -v web_password="$PROCURADORIA_WEB_PASSWORD" \
+  -f scripts/sql/migrate_fase9_web.sql
+```
 
-   ```bash
-   python scripts/migrar_sqlite_a_postgres.py
-   ```
+La web **no** ejecuta `init_db()` ni DDL.
 
-   ```bash
-   docker compose exec app python scripts/migrar_sqlite_a_postgres.py
-   ```
+Tras aplicar: smoke admin (misma URL postgres) — p. ej. `python scripts/consultar_rag.py …` e `ingest_documento.py` idempotente. El rol admin no queda sujeto a RLS (no usamos `FORCE ROW LEVEL SECURITY`).
 
-   Es normal que `init_db` ya haya sembrado los 13 módulos: el script **no aborta** por eso. Sí aborta si `documentos`/`chunks`/`items`/… ya tienen filas (usa `--force` solo si quieres reescribir esas tablas).
+---
 
-3. En el otro PC: mismo `.env` con el mismo `DATABASE_URL`. **No** vuelvas a migrar.
+## Correr la web en local
 
-## Descargar normativa (fase 8)
+```bash
+cp .env.example .env
+# DATABASE_URL, APP_PASSWORD, SESSION_SECRET, SESSION_HTTPS_ONLY=0
+pip install -r requirements-web.txt
+# Build local del SPA (opcional; en Render el Dockerfile corre npm run build):
+#   cd frontend && npm install && npm run build
+uvicorn backend.app.main:app --reload --port 8000 --proxy-headers
+```
 
-Las URLs oficiales están en `manifests/descargas_normativa.yaml` (lista estática; sin descubrimiento).
+Abre [http://localhost:8000](http://localhost:8000).
+
+Docker (servicio liviano):
+
+```bash
+docker compose up --build web
+```
+
+---
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/test_siguiente_no_leak.py tests/test_intentos_replay.py tests/test_error_after_lock.py -q
+```
+
+E2E con el rol restringido (después de la migración):
+
+```bash
+export DATABASE_URL_WEB='postgresql://procuradoria_web.<ref>:…@….pooler.supabase.com:5432/postgres'
+pytest tests/test_e2e_web_role.py -v
+```
+
+---
+
+## Administración local (ingesta / RAG / Gemini)
+
+Sigue igual que en fases 3–8. Usa `requirements-admin.txt` y la URL **admin** (`postgres.<ref>`), no el rol web.
+
+### Descargar normativa
 
 ```bash
 python scripts/descargar_normativa.py --insecure-ssl
 ```
 
-`--insecure-ssl` evita fallos por cadenas SSL incompletas en algunos `.gov.co`. Los HTML de `esp_05` / `com_10` se descargan pero **no** se ingieren en esta fase.
+HTML `esp_05` / `com_10`: solo descarga, sin ingesta.
 
-## Ingerir PDFs
-
-El Decreto Ley 262 ya puede estar en Supabase. El resto del corpus:
+### Ingerir PDFs
 
 ```bash
-python scripts/ingest_documento.py --manifest manifests/constitucion_politica_1991.yaml
-python scripts/ingest_documento.py --manifest manifests/ley_2220_2022.yaml
-python scripts/ingest_documento.py --manifest manifests/ley_1437_2011.yaml
-python scripts/ingest_documento.py --manifest manifests/ley_594_2000.yaml   # esp_06 + com_13
-python scripts/ingest_documento.py --manifest manifests/codigo_general_disciplinario.yaml
-python scripts/ingest_documento.py --manifest manifests/manual_mipg_v6_1.yaml
+python scripts/ingest_documento.py --manifest manifests/ley_594_2000.yaml
+# … demás manifiestos
 ```
 
-Ley 594 crea **un** chunk por artículo y lo enlaza a ambos módulos vía `chunk_modulos`. El SRS comparte la misma unidad de repaso (UNIQUE sin `modulo_id`).
-
-Antes de cambiar ese UNIQUE en una DB que ya tenga `srs_estado`:
-
-```bash
-python scripts/verificar_srs_colisiones.py
-```
-
-(`init_db` / `migrar_fase8_esquema` consolida colisiones si las hubiera y aplica el constraint.)
-
-## Indexar vectores (Chroma, **local por máquina**)
-
-Los vectores **no** viajan con Supabase. En **cada PC nuevo** (o tras borrar `data/chroma/`):
+### Vectores (Chroma, por máquina)
 
 ```bash
 python scripts/indexar_vectores.py --reindex-all
 ```
 
-```bash
-docker compose exec app python scripts/indexar_vectores.py --reindex-all
-```
-
-**Importante:** sin `--reindex-all`, el script solo mira `chroma_id` vacío en Postgres. Tras migrar, esa columna ya está llena (la llenó el otro PC) y el Chroma local estaría vacío → el RAG fallaría en silencio. En la primera indexación de una máquina usa siempre `--reindex-all`.
-
-## Probar la búsqueda
+### Generar / revisar ítems
 
 ```bash
-python scripts/consultar_rag.py --modulo esp_08 --query "funciones del Procurador General"
-```
-
-`com_11` sin corpus → `sin resultados`.
-
-## Generar y revisar ítems
-
-Igual que en la fase 5 (cuota Gemini aparte):
-
-```bash
-python scripts/generar_items.py --modulo esp_08 --limit 10 --dry-run
 python scripts/generar_items.py --all --limit 15
 python scripts/revisar_items.py --last 5
 ```
 
-## Probar SRS (fase 6)
+Diagnóstico local: scripts CLI (`consultar_rag.py`, etc.), no van a la imagen de Render.
 
-La repetición espaciada vive en backend (SM-2 adaptado a 5/2/0). No hace falta Streamlit ni Gemini.
+---
 
-```bash
-# Responder un ítem (crea/actualiza intentos + srs_estado)
-python scripts/simular_intento.py --item-id 3 --puntaje 5
-python scripts/simular_intento.py --item-id 3 --puntaje 0
-
-# Siguiente a practicar: vencidos antes que nuevos; excluye dudoso=1
-python scripts/siguiente_practica.py --modulo esp_08
-
-# Estado SRS del módulo
-python scripts/consultar_srs.py --modulo esp_08
-
-# Marcar / quitar dudoso (no borra el ítem)
-python scripts/simular_intento.py --item-id 3 --marcar-dudoso
-python scripts/simular_intento.py --item-id 3 --quitar-dudoso
-```
-
-Regla rápida: **5** alarga el intervalo y sube el ease; **2** vuelve en 1 día; **0** queda vencido de inmediato.
-
-## Practicar en pantalla (fase 7 / 7.1 / 7.2)
-
-La práctica diaria es la página principal de Streamlit (Home). El diagnóstico (RAG, conteos) quedó en la página lateral **Diagnóstico**.
-
-```bash
-streamlit run frontend/app.py
-# o: docker compose up  → abrir el puerto de Streamlit
-```
-
-Flujo: elige módulo (`esp_08`) → marca una letra (Responder está deshabilitado hasta elegir) → ve la matriz completa → Siguiente o Ítem dudoso. Sin Gemini en esta pantalla.
-
-**Fase 7.1 / 7.2:**
-
-- En Home, panel **Progreso de práctica** con métricas (Para hoy / Nuevos / Programados / Dudosos / Aciertos óptimos / Parciales / Fallos) y racha de últimos intentos (verde 5, amarillo 2, rojo 0; más reciente a la derecha). Fallos = intentos con puntaje 0 en la tabla `intentos`. No predice el examen oficial.
-- El aviso de no garantía aparece bajo el panel y otra vez al pie (a propósito).
-- Casos nuevos salen más narrativos tras el ajuste del prompt; hay que **regenerar** ítems para verlo (`generar_items.py`).
-- Al guardar un ítem, las 4 opciones se **barajan** y se reasignan letras A–D (la óptima no queda fija en D).
-- Latencia: pool Postgres con `close_returns=True` (psycopg-pool ≥ 3.3) + resumen sin N+1; `conn.close()` de los callers actuales recicla la conexión.
-
-## Qué queda en el disco vs en la nube
+## Qué vive dónde
 
 | Dónde | Uso |
 |---|---|
-| **Supabase (Postgres)** | Módulos, documentos, artículos, `chunk_modulos`, `items`, `intentos`, `srs_estado`, `chroma_id` (solo el ID de texto) |
-| `data/chroma/` | Vectores **locales** (no se sincronizan) |
-| `data/hf_cache/` | Modelo de embeddings local |
-| `documentos_entidades/pgn/` | PDFs/HTML oficiales en cada PC |
-| `manifests/descargas_normativa.yaml` | URLs de descarga (estático) |
-| `data/sqlite/app.db` | **Legado** tras migrar (respaldo; ya no es la fuente de verdad) |
-| `data/sqlite/generation.log` | Log opcional de generación |
-| `prompts/evaluator_elite_pgn.xml` | System prompt de generación |
-| `manifests/queries_generacion.yaml` | Queries del lote |
+| **Supabase** | Módulos, documentos, chunks, `chunk_modulos`, items, intentos, `srs_estado`, `presentaciones_consumidas` |
+| **Render** | Solo la API + SPA (sin Gemini, sin Chroma, sin PDFs) |
+| `backend/app/` | API: controllers → services → repositories → util / models |
+| `data/chroma/`, `data/hf_cache/` | Vectores y embeddings **locales** (admin) |
+| `documentos_entidades/pgn/` | PDFs/HTML oficiales (locales; no van al repo ni a Render) |
+| `frontend/dist/` | SPA compilada (build local opcional; en Render la genera el Dockerfile) |
+
+---
 
 ## Variables de entorno
 
-| Variable | Valor por defecto | Notas |
-|---|---|---|
-| `DATABASE_URL` | (vacía) | Obligatoria. URI Postgres de Supabase, Session mode |
-| `GOOGLE_API_KEY` | (vacía) | Obligatoria para generar (no para `--dry-run`) |
-| `GENERATION_PROVIDER` | `gemini` | `gemini` u `ollama` (ollama no implementado) |
-| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Ollama en el PC |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | Una llamada por ítem |
-| `EMBEDDING_MODEL` | `paraphrase-multilingual-mpnet-base-v2` | Español, local |
-| `CHROMA_COLLECTION` | `pgn_articulos` | Colección embebida local |
-| `RAG_MIN_SCORE` | `0.35` | Sin hits ≥ umbral no hay llamada a Gemini |
+| Variable | Notas |
+|---|---|
+| `DATABASE_URL` | Session pooler; en Render = rol `procuradoria_web.<ref>` |
+| `APP_PASSWORD` | Frase larga de acceso a la práctica |
+| `SESSION_SECRET` | Firma de cookie HttpOnly |
+| `SESSION_HTTPS_ONLY` | `1` en Render; `0` en local |
+| `GOOGLE_API_KEY` | Solo admin / generación; **no** en Render |
 
-## Motor local (más adelante)
+---
 
-Ollama es un respaldo opcional cuando no hay internet. No forma parte de `docker compose`.
+## Contrato rápido de la API
+
+- `GET /api/modulos/{codigo}/siguiente` → caso, enunciado, opciones (letra+texto), `presentacion_token`. **Nunca** puntaje, matriz, justificación, norma, artículo ni `chunk_ids`.
+- `POST /api/intentos` → registra en servidor y entonces devuelve matriz, cita y próximo repaso. Mismo token repetido → 200 replay. Otra pestaña que ya respondió el ítem → 409 «Esta pregunta ya fue respondida».

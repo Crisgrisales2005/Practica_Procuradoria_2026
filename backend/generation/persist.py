@@ -14,10 +14,23 @@ _LETRAS = ("A", "B", "C", "D")
 
 
 def _utc_now() -> str:
+    """Hora actual en UTC, en texto ISO y sin microsegundos.
+
+    Devuelve: la marca que se guarda en `items.creado_en`.
+    """
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def modulo_id_por_codigo(codigo: str, entidad: str = "pgn") -> int | None:
+    """Traduce un código de módulo al id de la tabla `modulos`.
+
+    Variables:
+        codigo: por ejemplo `esp_08`.
+        entidad: organismo. Por defecto `pgn`.
+        row: la fila encontrada.
+
+    Devuelve: el id, o None si el código no está sembrado.
+    """
     conn = get_connection()
     try:
         row = conn.execute(
@@ -34,6 +47,29 @@ def guardar_item(
     hits: list[Hit],
     entidad: str = "pgn",
 ) -> int:
+    """Inserta una pregunta válida. Norma y artículo salen del RAG, no del modelo.
+
+    Cómo: toma el primer hit como fuente de `norma`, `articulo` y `chunk_id`.
+    Baraja el orden de las opciones y les asigna las letras A–D en ese nuevo
+    orden, para que la respuesta óptima no quede siempre en la misma letra.
+    `opciones_json` guarda letra, texto, puntaje y categoría. `matriz_json`
+    añade la justificación, que la pantalla solo muestra después de responder.
+    `dudoso` nace en 0.
+
+    Variables:
+        item: pregunta ya validada.
+        hits: fragmentos usados. Hace falta al menos uno.
+        entidad: organismo. Por defecto `pgn`.
+        principal: el hit del que se copian norma y artículo.
+        modulo_id: id del módulo en Postgres.
+        mezcladas: opciones sin letra, en orden aleatorio.
+        opciones: las cuatro opciones con letra nueva, sin justificación.
+        matriz: las mismas, con justificación.
+        chunk_ids: JSON con los ids de chunk de los hits.
+        row: fila insertada, de la que se lee el id.
+
+    Devuelve: el `items.id` nuevo.
+    """
     if not hits:
         raise ValueError("no hay hits RAG para copiar norma/artículo")
     principal = hits[0]

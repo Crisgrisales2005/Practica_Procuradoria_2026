@@ -9,6 +9,19 @@ from typing import Any
 
 
 def verificar_colisiones_srs(conn) -> dict[str, Any]:
+    """Busca unidades de repaso duplicadas en `srs_estado`.
+
+    Cómo: agrupa por entidad, norma, artículo, chunk y nivel. Un grupo con más
+    de una fila es una colisión: el mismo tema tendría dos calendarios de
+    repaso, y la clave única nueva no podría crearse.
+
+    Variables:
+        conn: conexión Postgres ya abierta. Esta función no hace commit.
+        n: cuántas filas hay en total en `srs_estado`.
+        grupos: solo los grupos cuyo `COUNT(*)` es mayor que 1.
+
+    Devuelve: `n_srs` (total de filas) y `colisiones` (lista de grupos).
+    """
     n = int(conn.execute("SELECT COUNT(*) AS n FROM srs_estado").fetchone()["n"])
     grupos = conn.execute(
         """
@@ -30,7 +43,21 @@ def verificar_colisiones_srs(conn) -> dict[str, Any]:
 
 
 def consolidar_colisiones_srs(conn) -> int:
-    """Deja una fila por (entidad, norma, articulo, chunk_id, nivel). Retorna borradas."""
+    """Deja una sola fila de repaso por tema y borra las copias.
+
+    Cómo: para cada colisión ordena las filas por más repeticiones (`reps`),
+    luego por `next_due` más lejano y, si empatan, por el `id` menor. Conserva
+    la primera y borra el resto. No confirma la transacción.
+
+    Variables:
+        conn: conexión Postgres ya abierta.
+        grupos: colisiones detectadas por `verificar_colisiones_srs`.
+        borradas: cuántas filas se eliminaron.
+        rows: filas de un mismo tema, ya ordenadas.
+        keep: id de la fila que se conserva (el resto se borra).
+
+    Devuelve: cuántas filas se borraron.
+    """
     grupos = verificar_colisiones_srs(conn)["colisiones"]
     borradas = 0
     for g in grupos:
@@ -57,7 +84,20 @@ def consolidar_colisiones_srs(conn) -> int:
 
 
 def _renombrar_unique_srs(conn) -> None:
-    """Quita UNIQUE antigua (con modulo_id) y asegura la nueva (sin modulo_id)."""
+    """Cambia la clave única del repaso para que el módulo no parta el tema.
+
+    Cómo: lee las restricciones UNIQUE de `srs_estado`. Si alguna incluye
+    `modulo_id` y `chunk_id`, la elimina: esa versión antigua trataba el mismo
+    artículo como dos repasos distintos según el módulo. Después crea, si aún
+    no existe, la clave `(entidad, norma, articulo, chunk_id, nivel)`.
+
+    Variables:
+        conn: conexión Postgres ya abierta.
+        rows: restricciones UNIQUE actuales, con su nombre (`conname`) y su definición (`def`).
+        defn: definición en mayúsculas, para buscar `MODULO_ID`.
+        name: nombre de la restricción que se va a soltar.
+        exists: fila si la clave nueva ya está creada.
+    """
     rows = conn.execute(
         """
         SELECT c.conname, pg_get_constraintdef(c.oid) AS def
@@ -95,7 +135,26 @@ def _renombrar_unique_srs(conn) -> None:
 
 
 def migrar_fase8_esquema(conn) -> dict[str, Any]:
-    """Crea chunk_modulos, backfill, verifica/consolida SRS, cambia UNIQUE."""
+    """Prepara el esquema de la fase 8 dentro de la transacción de `init_db`.
+
+    Cómo, en orden:
+    1. Crea `chunk_modulos` si no existe, para que un artículo pueda pertenecer
+       a más de un módulo (Ley 594 va a `esp_06` y a `com_13`).
+    2. Copia el módulo que cada chunk ya tenía en `chunks.modulo_id`.
+    3. Si hay colisiones de repaso, las consolida.
+    4. Si después de consolidar todavía hay duplicados, aborta.
+    5. Ajusta la clave única del SRS.
+
+    Variables:
+        conn: conexión abierta. El `commit` lo hace `init_db`, no esta función.
+        backfill: resultado del INSERT de enlaces chunk–módulo.
+        n_backfill: filas insertadas, o el total de `chunk_modulos` si el driver
+            no informa `rowcount`.
+        prev / post: foto de las colisiones antes y después de consolidar.
+        borradas: filas de `srs_estado` eliminadas.
+
+    Devuelve: conteos de filas SRS, colisiones y enlaces, para poder revisarlos.
+    """
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS chunk_modulos (

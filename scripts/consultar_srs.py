@@ -16,6 +16,19 @@ from backend.srs import listar_srs_modulo
 
 
 def main() -> int:
+    """Imprime el calendario de repaso de un módulo.
+
+    Cómo: inicializa la base y lista `srs_estado` del módulo. Cada fila muestra
+    artículo, chunk, ease, intervalo, repeticiones, fallos y `next_due`.
+
+    Variables:
+        args.modulo: código. Por defecto `esp_08`.
+        args.entidad: organismo. Por defecto `pgn`.
+        filas: calendarios devueltos.
+        s: una fila.
+
+    Devuelve: 0. Si no hay filas, imprime `sin filas srs_estado`.
+    """
     parser = argparse.ArgumentParser(description="Consulta srs_estado por módulo.")
     parser.add_argument("--modulo", default="esp_08")
     parser.add_argument("--entidad", default="pgn")

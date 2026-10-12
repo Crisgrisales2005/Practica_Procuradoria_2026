@@ -81,3 +81,14 @@ CREATE TABLE IF NOT EXISTS srs_estado (
 CREATE INDEX IF NOT EXISTS idx_srs_next_due ON srs_estado (next_due);
 CREATE INDEX IF NOT EXISTS idx_items_modulo_dudoso ON items (modulo_id, dudoso);
 CREATE INDEX IF NOT EXISTS idx_intentos_item ON intentos (item_id);
+
+-- Fase 9: idempotencia de presentaciones web (también en migrate_fase9_web.sql).
+CREATE TABLE IF NOT EXISTS presentaciones_consumidas (
+    presentacion_id TEXT PRIMARY KEY,
+    item_id BIGINT NOT NULL REFERENCES items(id),
+    intento_id BIGINT NOT NULL REFERENCES intentos(id),
+    letra_elegida TEXT NOT NULL CHECK (letra_elegida IN ('A', 'B', 'C', 'D')),
+    puntaje INTEGER NOT NULL CHECK (puntaje IN (0, 2, 5)),
+    creado_en TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_presentaciones_item ON presentaciones_consumidas (item_id);
