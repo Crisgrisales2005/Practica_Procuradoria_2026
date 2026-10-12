@@ -5,7 +5,7 @@
   --accent: #0f5c5c;
   --accent-soft: #d7e8e8;
   --alert: #8b3a3a;
-  --warn: #a67c2a;
+  --warn: #7a5a14;
   --ok: #1f6b3a;
   --line: #c5ccd4;
   --card: #ffffff;
@@ -177,7 +177,7 @@ input {
 
 .badge.empty {
   background: #e4e7eb;
-  color: #6a7380;
+  color: #4a5560;
 }
 
 .caso,
