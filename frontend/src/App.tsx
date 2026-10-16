@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Feedback,
   Modulo,
@@ -19,9 +19,46 @@ const DISCLAIMER =
   "Herramienta de estudio. No garantiza un porcentaje de éxito en el examen oficial.";
 // Disclaimer duplicado a propósito (bajo el panel + pie). No consolidar.
 
-type Phase = "wake" | "login" | "modulos" | "practica";
-
+const SCORES_KEY = "procuradoria_scores_v1";
 const LAST_MOD_KEY = "procuradoria_ultimo_modulo";
+
+type Phase = "wake" | "login" | "modulos" | "practica";
+type Filter = "all" | "esp" | "com";
+
+function loadScores(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(SCORES_KEY) || "{}") as Record<
+      string,
+      number
+    >;
+  } catch {
+    return {};
+  }
+}
+
+function saveScore(codigo: string, pct: number) {
+  const cur = loadScores();
+  cur[codigo] = Math.max(cur[codigo] || 0, pct);
+  localStorage.setItem(SCORES_KEY, JSON.stringify(cur));
+}
+
+function Ring({
+  pct,
+  size = "lg",
+}: {
+  pct: number;
+  size?: "lg" | "sm";
+}) {
+  const p = Math.max(0, Math.min(100, pct));
+  return (
+    <div
+      className={`ring ${size === "sm" ? "sm" : ""}`}
+      style={{ ["--p" as string]: p }}
+      data-l={`${p}%`}
+      aria-label={`${p} por ciento`}
+    />
+  );
+}
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>("wake");
@@ -33,6 +70,9 @@ export default function App() {
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [modulo, setModulo] = useState<string | null>(null);
   const [progreso, setProgreso] = useState<Progreso | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
+  const [scores, setScores] = useState<Record<string, number>>(loadScores);
 
   const [pregunta, setPregunta] = useState<Pregunta | null>(null);
   const [vacio, setVacio] = useState<"sin_banco" | "sin_pendientes" | null>(null);
@@ -88,7 +128,15 @@ export default function App() {
     if (!modulo || phase !== "practica") return;
     void (async () => {
       try {
-        setProgreso(await fetchProgreso(modulo));
+        const p = await fetchProgreso(modulo);
+        setProgreso(p);
+        if (p.intentos_totales > 0) {
+          const pct = Math.round(
+            (p.aciertos_optimos / p.intentos_totales) * 100
+          );
+          saveScore(modulo, pct);
+          setScores(loadScores());
+        }
       } catch {
         /* ignore */
       }
@@ -188,21 +236,73 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (phase !== "practica" || feedback || !pregunta) return;
     function onKey(ev: KeyboardEvent) {
+      if (
+        phase === "modulos" &&
+        ev.key === "/" &&
+        (ev.target as HTMLElement)?.tagName !== "INPUT"
+      ) {
+        ev.preventDefault();
+        document
+          .querySelector<HTMLInputElement>('input[type="search"]')
+          ?.focus();
+        return;
+      }
+      if (phase !== "practica" || feedback || !pregunta) return;
       const k = ev.key.toUpperCase();
       if (["A", "B", "C", "D"].includes(k)) {
         setLetra(k);
+      }
+      const n = Number(ev.key);
+      if (n >= 1 && n <= 4) {
+        const op = pregunta.opciones[n - 1];
+        if (op) setLetra(op.letra);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [phase, feedback, pregunta]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return modulos.filter((m) => {
+      const kind = m.codigo.startsWith("esp") ? "esp" : "com";
+      if (filter !== "all" && kind !== filter) return false;
+      if (!q) return true;
+      return `${m.codigo} ${m.nombre} ${m.tipo}`.toLowerCase().includes(q);
+    });
+  }, [modulos, filter, query]);
+
+  const avgScore = useMemo(() => {
+    if (!modulos.length) return 0;
+    const sum = modulos.reduce((a, m) => a + (scores[m.codigo] || 0), 0);
+    return Math.round(sum / modulos.length);
+  }, [modulos, scores]);
+
+  const doneCount = useMemo(
+    () => modulos.filter((m) => (scores[m.codigo] || 0) > 0).length,
+    [modulos, scores]
+  );
+
+  const totalQ = useMemo(
+    () => modulos.reduce((a, m) => a + (m.en_banco || 0), 0),
+    [modulos]
+  );
+
+  const prepMsg =
+    doneCount === 0
+      ? "Empieza tu primer módulo"
+      : avgScore >= 70
+        ? "Vas por muy buen camino"
+        : "Sigue practicando, vas avanzando";
+
   if (phase === "wake") {
     return (
       <div className="wake">
-        <p className="brand">Preparación Sustanciador 4SU-11</p>
+        <div className="brand">
+          <span className="mark">P</span>
+          Preparación Sustanciador 4SU-11
+        </div>
         <p>{wakeMsg}</p>
       </div>
     );
@@ -210,39 +310,92 @@ export default function App() {
 
   if (phase === "login") {
     return (
-      <div className="app login-box">
-        <h1 className="brand">Preparación Sustanciador 4SU-11</h1>
-        <p className="sub">Acceso con contraseña de estudio</p>
-        <form onSubmit={onLogin}>
-          <label htmlFor="pw">Contraseña</label>
-          <input
-            id="pw"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {err && <p className="err">{err}</p>}
-          <button className="btn btn-primary" type="submit" disabled={busy || !password}>
-            Entrar
-          </button>
-        </form>
-        <p className="disclaimer">{DISCLAIMER}</p>
-      </div>
+      <section className="login">
+        <div className="hero">
+          <div className="brand">
+            <span className="mark">P</span>
+            Procuraduría · 4SU-11
+          </div>
+          <h1>
+            Practica con las preguntas institucionales de la PGN y sé de los{" "}
+            <em>más opcionados</em> a ganar.
+          </h1>
+          <p>
+            Concurso Abierto de Méritos 2026 · Sustanciador grado 11. Entrena
+            por módulos, recibe retroalimentación inmediata y mide tu nivel de
+            preparación.
+          </p>
+        </div>
+        <div className="login-panel">
+          <form className="box" onSubmit={onLogin}>
+            <h2>Ingresar</h2>
+            <p className="lead">Accede a tu simulador de práctica.</p>
+            <label htmlFor="pw">Contraseña</label>
+            <input
+              id="pw"
+              type="password"
+              placeholder="••••••••"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {err && <p className="err">{err}</p>}
+            <button
+              className="cta"
+              type="submit"
+              disabled={busy || !password}
+            >
+              Entrar
+            </button>
+            <p className="disclaimer">{DISCLAIMER}</p>
+          </form>
+        </div>
+      </section>
     );
   }
 
   if (phase === "modulos") {
+    const especificos = filtered.filter((m) => m.codigo.startsWith("esp"));
+    const comunes = filtered.filter((m) => m.codigo.startsWith("com"));
+
+    function ModCard({ m }: { m: Modulo }) {
+      const pct = scores[m.codigo] || 0;
+      return (
+        <button
+          type="button"
+          className="mod"
+          onClick={() => void openModulo(m.codigo)}
+        >
+          <div className="row">
+            <div>
+              <span className="code">{m.codigo.toUpperCase()}</span>
+              <h3>{m.nombre}</h3>
+              <small>{m.tipo === "especifico" ? "Específico" : "Común"}</small>
+            </div>
+            <Ring pct={pct} size="sm" />
+          </div>
+          <div className="foot">
+            <span>
+              {m.en_banco
+                ? `${m.en_banco} pregunta${m.en_banco === 1 ? "" : "s"}`
+                : "Sin preguntas"}
+            </span>
+            <span className="go">Practicar →</span>
+          </div>
+        </button>
+      );
+    }
+
     return (
-      <div className="app">
-        <div className="topbar">
-          <div>
-            <h1 className="brand">Preparación Sustanciador 4SU-11</h1>
-            <p className="sub">Elige un módulo para practicar</p>
+      <div className="wrap">
+        <div className="top">
+          <div className="brand">
+            <span className="mark">P</span>
+            Sustanciador 4SU-11
           </div>
           <button
             type="button"
-            className="linkish"
+            className="pill"
             onClick={async () => {
               await logout();
               setPhase("login");
@@ -251,210 +404,289 @@ export default function App() {
             Salir
           </button>
         </div>
-        {err && <p className="err">{err}</p>}
-        <ul className="mod-list">
-          {modulos.map((m) => (
-            <li key={m.codigo}>
-              <button type="button" className="mod-btn" onClick={() => void openModulo(m.codigo)}>
-                <span>
-                  <strong>{m.codigo}</strong> — {m.nombre}
-                </span>
-                <span className={`badge ${m.en_banco ? "" : "empty"}`}>
-                  {m.en_banco ? `${m.en_banco} preguntas` : "sin preguntas"}
-                </span>
-              </button>
-            </li>
+
+        <div className="bento">
+          <div className="tile t-hero">
+            <Ring pct={avgScore} />
+            <div>
+              <div className="code">ÍNDICE DE PREPARACIÓN</div>
+              <h2>{prepMsg}</h2>
+              <p>Promedio de tu mejor acierto óptimo por módulo (en este dispositivo).</p>
+            </div>
+          </div>
+          <div className="tile t-s">
+            <div className="kpi">
+              <b>{modulos.length}</b>
+              <span>Módulos</span>
+            </div>
+            <div className="kpi">
+              <b>{totalQ}</b>
+              <span>Preguntas</span>
+            </div>
+            <div className="kpi">
+              <b>{doneCount}</b>
+              <span>Con práctica</span>
+            </div>
+            <div className="kpi">
+              <b>{filtered.length}</b>
+              <span>Mostrando</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="tools">
+          <input
+            type="search"
+            placeholder="Buscar módulo o norma…  ( / )"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar módulo"
+          />
+          {(
+            [
+              ["all", "Todos"],
+              ["esp", "Específicos"],
+              ["com", "Comunes"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`pill ${filter === id ? "on" : ""}`}
+              onClick={() => setFilter(id)}
+            >
+              {label}
+            </button>
           ))}
-        </ul>
+        </div>
+
+        {err && <p className="err">{err}</p>}
+
+        {especificos.length > 0 && (
+          <>
+            <div className="sec">Módulos específicos</div>
+            <div className="grid">
+              {especificos.map((m) => (
+                <ModCard key={m.codigo} m={m} />
+              ))}
+            </div>
+          </>
+        )}
+        {comunes.length > 0 && (
+          <>
+            <div className="sec">Módulos comunes</div>
+            <div className="grid">
+              {comunes.map((m) => (
+                <ModCard key={m.codigo} m={m} />
+              ))}
+            </div>
+          </>
+        )}
+        {!filtered.length && (
+          <p className="sub">Sin resultados.</p>
+        )}
+
         <p className="disclaimer">{DISCLAIMER}</p>
       </div>
     );
   }
 
-  return (
-    <div className="app">
-      <div className="topbar">
-        <button type="button" className="linkish" onClick={() => setPhase("modulos")}>
-          ← Módulos
-        </button>
-        <span className="sub" style={{ margin: 0 }}>
-          {modulo}
-        </span>
-      </div>
+  const pctAcierto =
+    progreso && progreso.intentos_totales > 0
+      ? Math.round(
+          (progreso.aciertos_optimos / progreso.intentos_totales) * 100
+        )
+      : 0;
 
-      {progreso && (
-        <section className="panel" aria-label="Progreso de práctica">
-          <h2>Progreso de práctica</h2>
-          {(() => {
-            const total = progreso.intentos_totales || 0;
-            const pctAcierto =
-              total > 0
-                ? Math.round((progreso.aciertos_optimos / total) * 100)
-                : 0;
-            return (
-              <div className="acierto-bar" aria-label="Porcentaje de acierto">
-                <div className="acierto-bar-head">
-                  <span>Acierto óptimo</span>
-                  <strong>{total === 0 ? "—" : `${pctAcierto}%`}</strong>
-                </div>
-                <div
-                  className="acierto-bar-track"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={pctAcierto}
-                >
-                  <div
-                    className="acierto-bar-fill"
-                    style={{ width: `${pctAcierto}%` }}
-                  />
-                </div>
-                <p className="acierto-bar-hint">
-                  {total === 0
-                    ? "Aún no hay respuestas en este módulo."
-                    : `${progreso.aciertos_optimos} óptimas de ${total} intentos (parciales y fallos no cuentan como acierto).`}
+  const cola =
+    (progreso?.para_hoy || 0) + (progreso?.nuevos || 0);
+  const barW =
+    progreso && cola + (progreso.programados || 0) > 0
+      ? Math.round(
+          ((progreso.intentos_totales || 0) /
+            Math.max(
+              1,
+              (progreso.intentos_totales || 0) + cola
+            )) *
+            100
+        )
+      : 0;
+
+  return (
+    <div className="wrap">
+      <div className="qwrap">
+        <div className="top">
+          <button
+            type="button"
+            className="pill"
+            onClick={() => setPhase("modulos")}
+          >
+            ← Módulos
+          </button>
+          <span className="demo">{modulo?.toUpperCase()}</span>
+        </div>
+
+        {progreso && (
+          <section className="panel" aria-label="Progreso de práctica">
+            <div className="t-hero" style={{ display: "flex", gap: 20 }}>
+              <Ring pct={pctAcierto} />
+              <div style={{ flex: 1 }}>
+                <div className="code">ACIERTO ÓPTIMO</div>
+                <h2 style={{ margin: "4px 0 8px", fontSize: 24 }}>
+                  {progreso.intentos_totales === 0
+                    ? "Aún sin respuestas"
+                    : `${pctAcierto}% en este módulo`}
+                </h2>
+                <p className="sub" style={{ margin: 0 }}>
+                  {progreso.intentos_totales === 0
+                    ? "Responde para empezar a medir tu nivel."
+                    : `${progreso.aciertos_optimos} óptimas de ${progreso.intentos_totales} intentos.`}
                 </p>
               </div>
-            );
-          })()}
-          <div className="metrics">
-            <div className="metric">
-              <strong>{progreso.para_hoy}</strong>
-              <span>Para hoy</span>
             </div>
-            <div className="metric">
-              <strong>{progreso.nuevos}</strong>
-              <span>Nuevos</span>
+            <div className="bar" aria-hidden>
+              <i style={{ width: `${Math.min(100, barW)}%` }} />
             </div>
-            <div className="metric">
-              <strong>{progreso.programados}</strong>
-              <span>Programados (próximos días)</span>
+            <div className="metrics">
+              <div className="metric">
+                <strong>{progreso.para_hoy}</strong>
+                <span>Para hoy</span>
+              </div>
+              <div className="metric">
+                <strong>{progreso.nuevos}</strong>
+                <span>Nuevos</span>
+              </div>
+              <div className="metric">
+                <strong>{progreso.programados}</strong>
+                <span>Programados</span>
+              </div>
+              <div className="metric">
+                <strong>{progreso.dudosos}</strong>
+                <span>Dudosos</span>
+              </div>
+              <div className="metric">
+                <strong>{progreso.aciertos_optimos}</strong>
+                <span>Óptimas</span>
+              </div>
+              <div className="metric">
+                <strong>{progreso.parciales}</strong>
+                <span>Parciales</span>
+              </div>
+              <div className="metric">
+                <strong>{progreso.fallos}</strong>
+                <span>Fallos</span>
+              </div>
             </div>
-            <div className="metric">
-              <strong>{progreso.dudosos}</strong>
-              <span>Dudosos</span>
-            </div>
-            <div className="metric">
-              <strong>{progreso.aciertos_optimos}</strong>
-              <span>Aciertos óptimos</span>
-            </div>
-            <div className="metric">
-              <strong>{progreso.parciales}</strong>
-              <span>Parciales</span>
-            </div>
-            <div className="metric">
-              <strong>{progreso.fallos}</strong>
-              <span>Fallos</span>
-            </div>
-          </div>
-          {progreso.ultimos_intentos.length > 0 && (
-            <div className="racha" aria-label="Últimos intentos">
-              {progreso.ultimos_intentos.map((p, i) => (
-                <span key={i} className={`chip s${p}`} title={`${p}`}>
-                  {p}
-                </span>
+            {progreso.ultimos_intentos.length > 0 && (
+              <div className="racha" aria-label="Últimos intentos">
+                {progreso.ultimos_intentos.map((p, i) => (
+                  <span key={i} className={`chip s${p}`} title={`${p}`}>
+                    {p}
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="disclaimer">{DISCLAIMER}</p>
+          </section>
+        )}
+
+        {err && <p className="err">{err}</p>}
+        {busy && <p className="loading-inline">Cargando…</p>}
+
+        {vacio === "sin_banco" && (
+          <p className="sub">Este módulo aún no tiene preguntas en el banco.</p>
+        )}
+        {vacio === "sin_pendientes" && (
+          <p className="sub">
+            No hay más pendientes <strong>para hoy</strong>.
+            {progreso && progreso.programados > 0
+              ? ` Hay ${progreso.programados} repaso${progreso.programados === 1 ? "" : "s"} agendado${progreso.programados === 1 ? "" : "s"} para próximos días.`
+              : " Vuelve más tarde o elige otro módulo."}
+          </p>
+        )}
+
+        {pregunta && !feedback && (
+          <section>
+            {pregunta.caso ? <p className="caso">{pregunta.caso}</p> : null}
+            <h2 className="enunciado">{pregunta.enunciado}</h2>
+            <div className="opciones" role="radiogroup" aria-label="Opciones">
+              {pregunta.opciones.map((op, idx) => (
+                <button
+                  key={op.letra}
+                  type="button"
+                  className={`opt ${letra === op.letra ? "selected" : ""}`}
+                  onClick={() => setLetra(op.letra)}
+                  aria-pressed={letra === op.letra}
+                >
+                  <kbd>{idx + 1}</kbd>
+                  <span>
+                    <strong>{op.letra}.</strong> {op.texto}
+                  </span>
+                </button>
               ))}
             </div>
-          )}
-          {/* Disclaimer duplicado a propósito (bajo el panel + pie). No consolidar. */}
-          <p className="disclaimer">{DISCLAIMER}</p>
-        </section>
-      )}
-
-      {err && <p className="err">{err}</p>}
-      {busy && <p className="loading-inline">Cargando…</p>}
-
-      {vacio === "sin_banco" && (
-        <p>Este módulo aún no tiene preguntas en el banco.</p>
-      )}
-      {vacio === "sin_pendientes" && (
-        <p>
-          No hay más pendientes <strong>para hoy</strong>.
-          {progreso && progreso.programados > 0
-            ? ` Hay ${progreso.programados} repaso${progreso.programados === 1 ? "" : "s"} agendado${progreso.programados === 1 ? "" : "s"} para próximos días (SRS).`
-            : " Vuelve más tarde o elige otro módulo."}
-        </p>
-      )}
-
-      {pregunta && !feedback && (
-        <section>
-          <p className="caso">{pregunta.caso}</p>
-          <p className="enunciado">{pregunta.enunciado}</p>
-          <div className="opciones" role="radiogroup" aria-label="Opciones">
-            {pregunta.opciones.map((op) => (
+            <div className="actions">
               <button
-                key={op.letra}
                 type="button"
-                className={`opcion ${letra === op.letra ? "selected" : ""}`}
-                onClick={() => setLetra(op.letra)}
-                aria-pressed={letra === op.letra}
+                className="cta inline"
+                disabled={!letra || busy}
+                onClick={() => void onResponder()}
               >
-                <span className="letra">{op.letra}.</span>
-                {op.texto}
+                Responder
               </button>
-            ))}
-          </div>
-          <div className="actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!letra || busy}
-              onClick={() => void onResponder()}
-            >
-              Responder
-            </button>
-          </div>
-        </section>
-      )}
-
-      {feedback && (
-        <section>
-          <p>
-            <strong>{feedback.resultado}</strong>
-            {feedback.proximo_repaso
-              ? ` · Próximo repaso: ${feedback.proximo_repaso}`
-              : null}
-          </p>
-          <p className="sub">
-            Norma de apoyo: {feedback.cita.norma} · art. {feedback.cita.articulo}
-          </p>
-          {feedback.matriz.map((m) => (
-            <div
-              key={m.letra}
-              className={`matriz-item ${m.rol.toLowerCase()}`}
-            >
-              <div className="meta">
-                {m.letra}. {m.rol}
-                {m.es_eleccion ? " · Tu elección" : ""}
-                {m.es_optima ? " · Óptima" : ""}
-              </div>
-              <p>{m.texto}</p>
-              <p className="sub">{m.justificacion}</p>
             </div>
-          ))}
-          <div className="actions">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={busy || dudosoOk}
-              onClick={() => void onDudoso()}
-            >
-              {dudosoOk ? "Marcado dudoso" : "Ítem dudoso"}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy}
-              onClick={() => void onSiguiente()}
-            >
-              Siguiente
-            </button>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
 
-      {/* Disclaimer duplicado a propósito (bajo el panel + pie). No consolidar. */}
-      <p className="disclaimer">{DISCLAIMER}</p>
+        {feedback && (
+          <section>
+            <div className="why">
+              <b>{feedback.resultado}. </b>
+              {feedback.proximo_repaso
+                ? `Próximo repaso: ${feedback.proximo_repaso}. `
+                : null}
+              Norma de apoyo: {feedback.cita.norma} · art.{" "}
+              {feedback.cita.articulo}.
+            </div>
+            {feedback.matriz.map((m) => (
+              <div
+                key={m.letra}
+                className={`matriz-item ${m.rol.toLowerCase()} ${
+                  m.es_optima ? "ok" : ""
+                } ${m.es_eleccion && !m.es_optima ? "bad" : ""}`}
+              >
+                <div className="meta">
+                  {m.letra}. {m.rol}
+                  {m.es_eleccion ? " · Tu elección" : ""}
+                  {m.es_optima ? " · Óptima" : ""}
+                </div>
+                <p>{m.texto}</p>
+                <p className="sub">{m.justificacion}</p>
+              </div>
+            ))}
+            <div className="actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={busy || dudosoOk}
+                onClick={() => void onDudoso()}
+              >
+                {dudosoOk ? "Marcado dudoso" : "Ítem dudoso"}
+              </button>
+              <button
+                type="button"
+                className="cta inline"
+                disabled={busy}
+                onClick={() => void onSiguiente()}
+              >
+                Siguiente
+              </button>
+            </div>
+          </section>
+        )}
+
+        <p className="disclaimer">{DISCLAIMER}</p>
+      </div>
     </div>
   );
 }
