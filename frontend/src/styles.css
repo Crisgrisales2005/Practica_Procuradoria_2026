@@ -206,9 +206,9 @@ label {
   margin: 14px 0 6px;
 }
 
-input[type="password"],
-input[type="search"],
-input[type="text"] {
+.box input[type="password"],
+.box input[type="text"],
+.tools input[type="search"] {
   width: 100%;
   padding: 12px 14px;
   border-radius: 12px;

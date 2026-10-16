@@ -63,6 +63,7 @@ function Ring({
 export default function App() {
   const [phase, setPhase] = useState<Phase>("wake");
   const [wakeMsg, setWakeMsg] = useState("Despertando el servidor, un momento…");
+  const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -330,6 +331,15 @@ export default function App() {
           <form className="box" onSubmit={onLogin}>
             <h2>Ingresar</h2>
             <p className="lead">Accede a tu simulador de práctica.</p>
+            <label htmlFor="u">Usuario</label>
+            <input
+              id="u"
+              type="text"
+              placeholder="Tu usuario"
+              autoComplete="username"
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
+            />
             <label htmlFor="pw">Contraseña</label>
             <input
               id="pw"
